@@ -16,7 +16,7 @@ class App(Base):
 class Audio(Base):
     __tablename__ = "audios"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    app_name = Column(String, ForeignKey("apps.name"), nullable=False)
+    app_id = Column(UUID(as_uuid=True), ForeignKey("apps.id"), nullable=False)
     app = relationship("App", backref="audios")
     url = Column(String, nullable=False)
     status = Column(String, nullable=False)
@@ -25,7 +25,7 @@ class Audio(Base):
 class Category(Base):
     __tablename__ = "categories"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    app_name = Column(String, ForeignKey("apps.name"), nullable=False)
+    app_id = Column(UUID(as_uuid=True), ForeignKey("apps.id"), nullable=False)
     app = relationship("App", backref="categories")
     categories  =  Column(JSON, nullable=False)
 
