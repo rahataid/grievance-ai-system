@@ -12,10 +12,96 @@ A distributed, event-driven microservices system for sentiment analysis and grie
 - **tests/**: Unit, integration, load tests
 - **docs/**: Architecture, API, event flow, scaling
 
-## Quick Start
-1. Copy `.env.example` to `.env` and fill in values
-2. `docker-compose up -d` to start core infra
-3. Deploy services from `services/`
+## Local Setup
+1. Copy `.env.example` to `.env`.
+2. Create a virtual environment with `uv`:
+   ```bash
+   uv venv .venv --python 3.11
+   source .venv/bin/activate
+   ```
+3. Install the packages currently used by the workers and test script:
+   ```bash
+   uv pip install --python .venv/bin/python aio-pika fastapi sqlalchemy alembic psycopg2-binary uvicorn pytest
+   ```
+4. Start infrastructure:
+   ```bash
+   docker-compose up -d rabbitmq redis postgres postgres-migrations
+   ```
+5. Export the RabbitMQ connection used by the workers:
+   ```bash
+   export RABBIT_URL=amqp://sentiment:password@localhost:5672/
+   ```
+
+## Run The Pipeline
+Start all worker services from the repository root:
+
+```bash
+pkill -f 'app.main' || true
+rm -f logs/*.log
+bash scripts/run_workers.sh
+```
+
+This starts these workers in the background and writes logs to `logs/*.log`:
+- `audio-service`
+- `asr-service`
+- `language-service`
+- `translation-service`
+- `nlp-service`
+- `urgency-service`
+- `persistence-service`
+
+To watch the pipeline live:
+
+
+
+To publish a test message into the first queue:
+
+```bash
+python tests/test_pipeline.py
+```
+
+## What Happens When You Run It
+The current test publishes one message with routing key `audio.raw`. The workers then process it in this order:
+
+```text
+audio.raw -> audio.uploaded -> transcription.completed -> text.translated -> nlp.analyzed -> urgency.derived
+```
+
+Observed behavior with the current stub implementations:
+- `audio-service` saves the incoming bytes to `services/audio-service/uploads/` and converts the file path to a `.wav` path.
+- `asr-service` creates a fake transcript based on the audio path.
+- `language-service` detects the transcript as English and skips translation.
+- `translation-service` stays idle for this test because only non-English messages are routed there.
+- `nlp-service` produces stub sentiment, emotion, and category values.
+- `urgency-service` derives an urgency level from the NLP output.
+- `persistence-service` prints the final payload to its log as the terminal stage.
+
+For the current test payload, the final result is an English path with a neutral NLP result and `low` urgency.
+
+## Example Logs
+After a successful run, you should see output like this:
+
+```text
+audio-service.log        Processed audio -> uploads/<file>.wav
+asr-service.log          Transcribed: Transcription of uploads/<file>.wav
+language-service.log     English detected -> skipping translation
+nlp-service.log          NLP done -> {'sentiment': 'neutral', 'emotion': 'calm', 'category': 'general'}
+urgency-service.log      urgency: low
+persistence-service.log  persisted: test-001
+```
+
+## Stop The Pipeline
+Stop the worker processes:
+
+```bash
+pkill -f 'app.main'
+```
+
+Stop infrastructure:
+
+```bash
+docker-compose down
+```
 
 ## Production
 - Use `deployments/k8s/` for Kubernetes
