@@ -76,24 +76,85 @@ Each microservice contains its own `app/`, `Dockerfile`, and configs.
    alembic upgrade head
    ```
 
-6. **Start microservices:**
-   - Each service can be started individually. For example:
-     ```bash
-     cd services/api-gateway/app
-     uvicorn main:app --reload
-     ```
-   - Repeat for other services (see their respective README/config).
-
-7. **(Optional) Generate API keys:**
-
+6. Export the RabbitMQ connection used by the workers:
    ```bash
-   ./scripts/generate_api_key.sh <identifier> [expires_days]
+   export RABBIT_URL=amqp://sentiment:password@localhost:5672/
    ```
 
-8. **Access API docs:**
-   - Most FastAPI services expose Swagger UI at `/docs` (e.g., http://localhost:8000/docs)
+## Run The Pipeline
 
-See the `docs/` folder for more details on architecture, API, and advanced deployment.
+Start all worker services from the repository root:
+
+```bash
+pkill -f 'app.main' || true
+rm -f logs/*.log
+bash scripts/run_workers.sh
+```
+
+This starts these workers in the background and writes logs to `logs/*.log`:
+
+- `audio-service`
+- `asr-service`
+- `language-service`
+- `translation-service`
+- `nlp-service`
+- `urgency-service`
+- `persistence-service`
+
+To watch the pipeline live:
+
+To publish a test message into the first queue:
+
+```bash
+python tests/test_pipeline.py
+```
+
+## What Happens When You Run It
+
+The current test publishes one message with routing key `audio.raw`. The workers then process it in this order:
+
+```text
+audio.raw -> audio.uploaded -> transcription.completed -> text.translated -> nlp.analyzed -> urgency.derived
+```
+
+Observed behavior with the current stub implementations:
+
+- `audio-service` saves the incoming bytes to `services/audio-service/uploads/` and converts the file path to a `.wav` path.
+- `asr-service` creates a fake transcript based on the audio path.
+- `language-service` detects the transcript as English and skips translation.
+- `translation-service` stays idle for this test because only non-English messages are routed there.
+- `nlp-service` produces stub sentiment, emotion, and category values.
+- `urgency-service` derives an urgency level from the NLP output.
+- `persistence-service` prints the final payload to its log as the terminal stage.
+
+For the current test payload, the final result is an English path with a neutral NLP result and `low` urgency.
+
+## Example Logs
+
+After a successful run, you should see output like this:
+
+```text
+audio-service.log        Processed audio -> uploads/<file>.wav
+asr-service.log          Transcribed: Transcription of uploads/<file>.wav
+language-service.log     English detected -> skipping translation
+nlp-service.log          NLP done -> {'sentiment': 'neutral', 'emotion': 'calm', 'category': 'general'}
+urgency-service.log      urgency: low
+persistence-service.log  persisted: test-001
+```
+
+## Stop The Pipeline
+
+Stop the worker processes:
+
+```bash
+pkill -f 'app.main'
+```
+
+Stop infrastructure:
+
+```bash
+docker-compose down
+```
 
 ## Production
 

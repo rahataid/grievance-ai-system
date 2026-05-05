@@ -1,1 +1,51 @@
 # Entry point for Urgency Service
+import asyncio
+import json
+import aio_pika
+from app.config import RABBIT_URL, EXCHANGE, QUEUE, IN_KEY, OUT_KEY
+from app.processor.urgency import compute_urgency
+
+
+
+async def process(message, exchange):
+    async with message.process():
+        data = json.loads(message.body.decode())
+
+        urgency = compute_urgency(
+            data.get("sentiment"),
+            data.get("emotion"),
+            data.get("category")
+        )
+
+        data["urgency"] = urgency
+
+        await exchange.publish(
+            aio_pika.Message(
+                body=json.dumps(data).encode(),
+                delivery_mode=aio_pika.DeliveryMode.PERSISTENT
+            ),
+            routing_key=OUT_KEY
+        )
+
+        print("⚡ urgency:", urgency)
+
+
+async def main():
+    conn = await aio_pika.connect_robust(RABBIT_URL)
+    ch = await conn.channel()
+    await ch.set_qos(prefetch_count=1)
+
+    exchange = await ch.declare_exchange(EXCHANGE, aio_pika.ExchangeType.TOPIC, durable=True)
+
+    queue = await ch.declare_queue(QUEUE, durable=True)
+    await queue.bind(exchange, routing_key=IN_KEY)
+
+    await queue.consume(lambda m: process(m, exchange))
+
+    print("⚡ urgency service running")
+
+    await asyncio.Future()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
