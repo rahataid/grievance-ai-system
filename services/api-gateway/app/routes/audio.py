@@ -1,6 +1,11 @@
+import json
+from uuid import uuid4
+
+import aio_pika
 from fastapi import APIRouter, Header, HTTPException, UploadFile, File, status
 from typing import Optional
 
+from app.config import RABBIT_URL, EXCHANGE_NAME, ENTRY_ROUTING_KEY
 from app.schemas import (
     AudioStatus,
     PipelineStage,
@@ -21,6 +26,27 @@ def _require_auth(x_api_key: Optional[str], authorization: Optional[str]) -> Non
         )
 
 
+async def _publish_audio_event(payload: dict) -> None:
+    connection = await aio_pika.connect_robust(RABBIT_URL)
+    channel = await connection.channel()
+    exchange = await channel.declare_exchange(
+        EXCHANGE_NAME,
+        aio_pika.ExchangeType.TOPIC,
+        durable=True,
+    )
+
+    try:
+        await exchange.publish(
+            aio_pika.Message(
+                body=json.dumps(payload).encode(),
+                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+            ),
+            routing_key=ENTRY_ROUTING_KEY,
+        )
+    finally:
+        await connection.close()
+
+
 @router.post(
     "",
     response_model=UploadAudioResponse,
@@ -38,9 +64,25 @@ async def upload_audio(
     Returns a unique `audio_id` that can be used to poll the processing status.
     """
     _require_auth(x_api_key, authorization)
-    # TODO: forward file to audio-service and publish to pipeline queue
+    audio_bytes = await file.read()
+    audio_id = str(uuid4())
+
+    payload = {
+        "request_id": audio_id,
+        "filename": file.filename or f"{audio_id}.wav",
+        "audio_bytes": audio_bytes.decode("latin1"),
+    }
+
+    try:
+        await _publish_audio_event(payload)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to publish audio: {exc}",
+        ) from exc
+
     return UploadAudioResponse(
-        audio_id="00000000-0000-0000-0000-000000000000",
+        audio_id=audio_id,
         status=AudioStatus.uploaded,
     )
 

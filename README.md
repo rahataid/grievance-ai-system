@@ -198,7 +198,22 @@ cd services/api-gateway
 uvicorn app.main:app --reload --port 8000
 ```
 
-> **Note:** Do not use `services.api_gateway.app.main` — the directory name contains a hyphen which Python cannot import as a module. Always use one of the two options above.
+**Option C — start workers + API together** (single command):
+
+```bash
+source .venv/bin/activate
+bash scripts/run_api_with_workers.sh
+```
+
+This starts all worker consumers (`audio-service`, `asr-service`, `language-service`, `translation-service`, `nlp-service`, `urgency-service`, `persistence-service`) and then runs the API Gateway.
+
+> **Stop behavior:** `Ctrl+C` stops only FastAPI. Workers are background processes; stop them with:
+>
+> ```bash
+> pkill -f 'app.main'
+> ```
+
+> **Note:** Do not use `services.api_gateway.app.main` — the directory name contains a hyphen which Python cannot import as a module. Use one of the startup options above.
 
 The server will be available at **http://localhost:8000**.
 
