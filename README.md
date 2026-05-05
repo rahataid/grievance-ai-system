@@ -166,3 +166,81 @@ docker-compose down
 - See `docs/api-key-auth.md` for full design and integration details
 - Generate keys: `./scripts/generate_api_key.sh <identifier> [expires_days]`
 - Protect FastAPI routes: add `Depends(verify_api_key)`
+
+---
+
+## Running the API Gateway
+
+The API Gateway is a FastAPI app located at `services/api-gateway/`.
+
+### Prerequisites
+
+Make sure you have a virtual environment with dependencies installed (see **Local Setup** above). The gateway only needs `fastapi`, `uvicorn`, and `python-multipart`:
+
+```bash
+uv pip install --python .venv/bin/python fastapi uvicorn python-multipart
+```
+
+### Start the server
+
+**Option A — from the repo root** (recommended, no `cd` needed):
+
+```bash
+source .venv/bin/activate
+uvicorn app.main:app --app-dir services/api-gateway --reload --port 8000
+```
+
+**Option B — from inside the service directory**:
+
+```bash
+source .venv/bin/activate
+cd services/api-gateway
+uvicorn app.main:app --reload --port 8000
+```
+
+> **Note:** Do not use `services.api_gateway.app.main` — the directory name contains a hyphen which Python cannot import as a module. Always use one of the two options above.
+
+The server will be available at **http://localhost:8000**.
+
+### Interactive API docs
+
+| URL | Description |
+|-----|-------------|
+| http://localhost:8000/docs | Swagger UI (try endpoints interactively) |
+| http://localhost:8000/redoc | ReDoc documentation |
+| http://localhost:8000/openapi.json | Raw OpenAPI schema |
+
+### Available endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/auth/register` | Register a new application |
+| `POST` | `/auth/login` | Login and receive a JWT token |
+| `GET` | `/auth/verify` | Verify an API key or JWT token |
+| `POST` | `/auth/api-key` | Generate a new API key |
+| `POST` | `/audio` | Upload an audio file for processing |
+| `GET` | `/audio/{audio_id}` | Poll processing status and results |
+| `GET` | `/health` | Health check |
+
+### Quick smoke test with curl
+
+```bash
+# Register
+curl -s -X POST http://localhost:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"my_app","email":"test@example.com"}'
+
+# Login
+curl -s -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com"}'
+
+# Upload audio (requires X-API-Key or Authorization header)
+curl -s -X POST http://localhost:8000/audio \
+  -H "X-API-Key: my_key" \
+  -F "file=@/path/to/audio.wav"
+
+# Poll status
+curl -s http://localhost:8000/audio/<audio_id> \
+  -H "X-API-Key: my_key"
+```
