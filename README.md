@@ -236,35 +236,59 @@ The server will be available at **http://localhost:8000**.
 
 ### Available endpoints
 
-| Method | Path                | Description                         |
-| ------ | ------------------- | ----------------------------------- |
-| `POST` | `/auth/register`    | Register a new application          |
-| `POST` | `/auth/login`       | Login and receive a JWT token       |
-| `GET`  | `/auth/verify`      | Verify an API key or JWT token      |
-| `POST` | `/auth/api-key`     | Generate a new API key              |
-| `POST` | `/audio`            | Upload an audio file for processing |
-| `GET`  | `/audio/{audio_id}` | Poll processing status and results  |
-| `GET`  | `/health`           | Health check                        |
+| Method   | Path                | Description                         |
+| -------- | ------------------- | ----------------------------------- |
+| `POST`   | `/auth/register`    | Register a new application          |
+| `POST`   | `/auth/login`       | Login and receive a JWT token       |
+| `POST`   | `/auth/api-key`     | Generate an API key from a JWT      |
+| `DELETE` | `/auth/api-key`     | Revoke the active API key           |
+| `GET`    | `/auth/verify`      | Verify an API key                   |
+| `POST`   | `/audio`            | Upload an audio file for processing |
+| `GET`    | `/audio/{audio_id}` | Poll processing status and results  |
+| `GET`    | `/health`           | Health check                        |
 
 ### Quick smoke test with curl
 
 ```bash
-# Register
+# Register an app
 curl -s -X POST http://localhost:8000/auth/register \
   -H "Content-Type: application/json" \
   -d '{"name":"my_app","email":"test@example.com"}'
 
-# Login
-curl -s -X POST http://localhost:8000/auth/login \
+# Login and capture JWT
+LOGIN_RESPONSE=$(curl -s -X POST http://localhost:8000/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com"}'
+   -d '{"email":"test@example.com"}')
 
-# Upload audio (requires X-API-Key or Authorization header)
+JWT_TOKEN=$(printf '%s' "$LOGIN_RESPONSE" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+
+# Generate an API key from the JWT
+API_KEY_RESPONSE=$(curl -s -X POST http://localhost:8000/auth/api-key \
+   -H "Authorization: Bearer $JWT_TOKEN")
+
+API_KEY=$(printf '%s' "$API_KEY_RESPONSE" | sed -n 's/.*"api_key":"\([^"]*\)".*/\1/p')
+
+# Verify the API key
+curl -s http://localhost:8000/auth/verify \
+   -H "X-API-Key: $API_KEY"
+
+# Upload audio with the API key
 curl -s -X POST http://localhost:8000/audio \
-  -H "X-API-Key: my_key" \
+   -H "X-API-Key: $API_KEY" \
   -F "file=@/path/to/audio.wav"
 
 # Poll status
 curl -s http://localhost:8000/audio/<audio_id> \
-  -H "X-API-Key: my_key"
+   -H "X-API-Key: $API_KEY"
+
+# Revoke the API key
+curl -s -X DELETE http://localhost:8000/auth/api-key \
+   -H "Authorization: Bearer $JWT_TOKEN"
 ```
+
+Auth flow summary:
+
+- Use `/auth/register` to create an app record.
+- Use `/auth/login` to get a JWT bearer token.
+- Use that JWT once to create or revoke the app's API key.
+- Use the API key in `X-API-Key` for protected routes such as `/audio` and `/auth/verify`.
