@@ -187,40 +187,64 @@ uv pip install --python .venv/bin/python fastapi uvicorn python-multipart
 
 ```bash
 source .venv/bin/activate
-uvicorn app.main:app --app-dir services/api-gateway --reload --port 8000
+PYTHONPATH=services/api-gateway:. uvicorn app.main:app --app-dir services/api-gateway --reload --port 8000
 ```
+
+This repo-root command needs both import roots:
+
+- `services/api-gateway` so `app.main` resolves
+- `.` so shared modules like `shared.database.models` and `services.auth_service` resolve
+
+Without the extra `PYTHONPATH`, `uvicorn --app-dir` adds only `services/api-gateway` to Python's import path, which causes `ModuleNotFoundError: No module named 'shared'`.
 
 **Option B — from inside the service directory**:
 
 ```bash
 source .venv/bin/activate
 cd services/api-gateway
-uvicorn app.main:app --reload --port 8000
+PYTHONPATH=../.. uvicorn app.main:app --reload --port 8000
 ```
 
-> **Note:** Do not use `services.api_gateway.app.main` — the directory name contains a hyphen which Python cannot import as a module. Always use one of the two options above.
+**Option C — use the repo launcher**:
+
+```bash
+source .venv/bin/activate
+.venv/bin/python main.py
+```
+
+**Option D — install the project as an editable package**:
+
+```bash
+source .venv/bin/activate
+pip install -e .
+uvicorn app.main:app --app-dir services/api-gateway --reload --port 8000
+```
+
+This is the cleanest setup for local development if you want `shared` and `services.auth_service` to be importable without setting `PYTHONPATH` on every run.
+
+> **Note:** Do not use `services.api_gateway.app.main` — the directory name contains a hyphen which Python cannot import as a module. Use one of the launch options above instead.
 
 The server will be available at **http://localhost:8000**.
 
 ### Interactive API docs
 
-| URL | Description |
-|-----|-------------|
-| http://localhost:8000/docs | Swagger UI (try endpoints interactively) |
-| http://localhost:8000/redoc | ReDoc documentation |
-| http://localhost:8000/openapi.json | Raw OpenAPI schema |
+| URL                                | Description                              |
+| ---------------------------------- | ---------------------------------------- |
+| http://localhost:8000/docs         | Swagger UI (try endpoints interactively) |
+| http://localhost:8000/redoc        | ReDoc documentation                      |
+| http://localhost:8000/openapi.json | Raw OpenAPI schema                       |
 
 ### Available endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/auth/register` | Register a new application |
-| `POST` | `/auth/login` | Login and receive a JWT token |
-| `GET` | `/auth/verify` | Verify an API key or JWT token |
-| `POST` | `/auth/api-key` | Generate a new API key |
-| `POST` | `/audio` | Upload an audio file for processing |
-| `GET` | `/audio/{audio_id}` | Poll processing status and results |
-| `GET` | `/health` | Health check |
+| Method | Path                | Description                         |
+| ------ | ------------------- | ----------------------------------- |
+| `POST` | `/auth/register`    | Register a new application          |
+| `POST` | `/auth/login`       | Login and receive a JWT token       |
+| `GET`  | `/auth/verify`      | Verify an API key or JWT token      |
+| `POST` | `/auth/api-key`     | Generate a new API key              |
+| `POST` | `/audio`            | Upload an audio file for processing |
+| `GET`  | `/audio/{audio_id}` | Poll processing status and results  |
+| `GET`  | `/health`           | Health check                        |
 
 ### Quick smoke test with curl
 

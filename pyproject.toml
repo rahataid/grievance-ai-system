@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "grievance-ai-system"
 version = "0.1.0"
@@ -7,5 +11,21 @@ requires-python = ">=3.11"
 dependencies = [
     "alembic>=1.18.4",
     "asyncpg>=0.31.0",
+    "email-validator>=2.3.0",
+    "fastapi[standard]>=0.136.1",
     "pydantic-settings>=2.14.0",
+    "PyJWT>=2.10.1",
+    "psycopg2-binary>=2.9.10",
+    "python-multipart>=0.0.27",
+    "redis>=5.2.1",
+    "SQLAlchemy>=2.0.44",
+    "uvicorn>=0.46.0",
 ]
+
+[tool.setuptools]
+py-modules = ["config", "main"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["shared*", "services.auth_service*"]
+namespaces = true
