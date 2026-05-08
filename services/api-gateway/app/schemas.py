@@ -52,6 +52,9 @@ class CreateApiKeyResponse(BaseModel):
     api_key: str
 
 
+class RevokeApiKeyResponse(BaseModel):
+    message: str
+
 # ── Audio schemas ──────────────────────────────────────────────────────────────
 
 class UploadAudioResponse(BaseModel):

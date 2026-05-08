@@ -11,6 +11,7 @@ from app.schemas import (
     RegisterResponse,
     LoginRequest,
     LoginResponse,
+    RevokeApiKeyResponse,
     VerifyResponse,
     CreateApiKeyResponse,
 )
@@ -156,6 +157,7 @@ async def create_api_key(
 
 @router.delete(
     "/api-key",
+    response_model=RevokeApiKeyResponse,
     status_code=status.HTTP_200_OK,
     summary="Revoke the active API key",
     responses={401: {"description": "Unauthorized"}, 404: {"description": "No active key found"}},
@@ -198,8 +200,9 @@ async def revoke_api_key(
 
     existing_key.is_active = False
     await db.commit()
+    await db.refresh(existing_key)
 
-    return {"message": "API key revoked successfully"}
+    return RevokeApiKeyResponse(message="API key revoked successfully")
 
 
 @router.get(
