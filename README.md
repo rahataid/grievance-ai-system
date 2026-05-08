@@ -212,17 +212,22 @@ source .venv/bin/activate
 .venv/bin/python main.py
 ```
 
-**Option D — install the project as an editable package**:
+**Option C — start workers + API together** (single command):
 
 ```bash
 source .venv/bin/activate
-pip install -e .
-uvicorn app.main:app --app-dir services/api-gateway --reload --port 8000
+bash scripts/run_api_with_workers.sh
 ```
 
-This is the cleanest setup for local development if you want `shared` and `services.auth_service` to be importable without setting `PYTHONPATH` on every run.
+This starts all worker consumers (`audio-service`, `asr-service`, `language-service`, `translation-service`, `nlp-service`, `urgency-service`, `persistence-service`) and then runs the API Gateway.
 
-> **Note:** Do not use `services.api_gateway.app.main` — the directory name contains a hyphen which Python cannot import as a module. Use one of the launch options above instead.
+> **Stop behavior:** `Ctrl+C` stops only FastAPI. Workers are background processes; stop them with:
+>
+> ```bash
+> pkill -f 'app.main'
+> ```
+
+> **Note:** Do not use `services.api_gateway.app.main` — the directory name contains a hyphen which Python cannot import as a module. Use one of the startup options above.
 
 The server will be available at **http://localhost:8000**.
 
