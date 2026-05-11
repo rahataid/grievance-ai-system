@@ -10,6 +10,7 @@ class Audio(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     app_id = Column(UUID(as_uuid=True), ForeignKey("apps.id"), nullable=False)
     app = relationship("App", backref="audios")
+    grievances = relationship("Grievance", back_populates="audio")
     url = Column(String, nullable=False)
     status = Column(String, nullable=False)
     current_stage = Column(String, nullable=False)

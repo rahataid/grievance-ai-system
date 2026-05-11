@@ -166,6 +166,7 @@ docker-compose down
 - See `docs/api-key-auth.md` for full design and integration details
 - Generate keys: `./scripts/generate_api_key.sh <identifier> [expires_days]`
 - Protect FastAPI routes: add `Depends(verify_api_key)`
+- The API gateway also enforces API key checks in middleware for protected routes
 
 ---
 
@@ -252,6 +253,13 @@ The server will be available at **http://localhost:8000**.
 | `GET`    | `/audio/{audio_id}` | Poll processing status and results  |
 | `GET`    | `/health`           | Health check                        |
 
+### Auth rules
+
+- Public routes: `/health`, `/docs`, `/openapi.json`, `/redoc`, `/auth/register`, `/auth/login`
+- JWT bearer token routes: `POST /auth/api-key`, `DELETE /auth/api-key`
+- API key routes: `GET /auth/verify`, `POST /audio`, `GET /audio/{audio_id}`
+- Protected requests are enforced at the API gateway middleware layer, and the audio routes also declare API key security in OpenAPI so Swagger shows lock icons
+
 ### Quick smoke test with curl
 
 ```bash
@@ -295,5 +303,5 @@ Auth flow summary:
 
 - Use `/auth/register` to create an app record.
 - Use `/auth/login` to get a JWT bearer token.
-- Use that JWT once to create or revoke the app's API key.
+- Use that JWT only for `/auth/api-key` create and revoke operations.
 - Use the API key in `X-API-Key` for protected routes such as `/audio` and `/auth/verify`.

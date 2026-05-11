@@ -1,5 +1,6 @@
 from sqlalchemy import Column, String, Boolean
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 import uuid
 from shared.database.base import Base
 
@@ -9,3 +10,4 @@ class App(Base):
     name = Column(String, nullable=False)
     email = Column(String, nullable=False)
     is_verified = Column(Boolean, default=False)
+    categories = relationship("Category", back_populates="app")

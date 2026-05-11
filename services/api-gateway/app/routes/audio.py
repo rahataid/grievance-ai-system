@@ -2,8 +2,7 @@ import json
 from uuid import uuid4
 
 import aio_pika
-from fastapi import APIRouter, Header, HTTPException, UploadFile, File, status
-from typing import Optional
+from fastapi import APIRouter, File, HTTPException, Security, UploadFile, status
 
 from app.config import RABBIT_URL, EXCHANGE_NAME, ENTRY_ROUTING_KEY
 from app.schemas import (
@@ -13,18 +12,9 @@ from app.schemas import (
     AudioStatusResponse,
     GrievanceData,
 )
+from services.auth_service.app.api_keys import API_KEY_HEADER
 
 router = APIRouter(prefix="/audio", tags=["Audio"])
-
-
-def _require_auth(x_api_key: Optional[str], authorization: Optional[str]) -> None:
-    """Raise 401 if neither credential is supplied."""
-    if not x_api_key and not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized",
-        )
-
 
 async def _publish_audio_event(payload: dict) -> None:
     connection = await aio_pika.connect_robust(RABBIT_URL)
@@ -56,14 +46,12 @@ async def _publish_audio_event(payload: dict) -> None:
 )
 async def upload_audio(
     file: UploadFile = File(..., description="Audio file to process"),
-    x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
-    authorization: Optional[str] = Header(default=None),
+    _api_key: str | None = Security(API_KEY_HEADER),
 ):
     """
     Upload an audio file. The file is queued for the processing pipeline.
     Returns a unique `audio_id` that can be used to poll the processing status.
     """
-    _require_auth(x_api_key, authorization)
     audio_bytes = await file.read()
     audio_id = str(uuid4())
 
@@ -99,8 +87,7 @@ async def upload_audio(
 )
 async def get_audio_status(
     audio_id: str,
-    x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
-    authorization: Optional[str] = Header(default=None),
+    _api_key: str | None = Security(API_KEY_HEADER),
 ):
     """
     Retrieve the current pipeline stage and any available processed data
@@ -108,7 +95,6 @@ async def get_audio_status(
 
     Poll this endpoint until `status` is `completed` or `failed`.
     """
-    _require_auth(x_api_key, authorization)
     # TODO: query persistence-service for the audio record
     return AudioStatusResponse(
         audio_id=audio_id,
