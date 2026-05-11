@@ -20,6 +20,7 @@ dependencies = [
     "redis>=5.2.1",
     "SQLAlchemy>=2.0.44",
     "uvicorn>=0.46.0",
+    "aio-pika>=9.6.2",
 ]
 
 [tool.setuptools]
