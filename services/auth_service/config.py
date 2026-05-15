@@ -9,10 +9,11 @@ logger = logging.getLogger(__name__)
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    DATABASE_URL: str
-    REDIS_URL: str = "redis://localhost:6379/0"
-    AUTH_CACHE_TTL_SECONDS: int = 300
-
+    JWT_SECRET_KEY: str = "secret-key"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    JWT_ISSUER: str = "grievance-auth-service"
+    JWT_AUDIENCE: str = "grievance-api"
 
     model_config = SettingsConfigDict(
         env_file=".env",

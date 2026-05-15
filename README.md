@@ -166,6 +166,7 @@ docker-compose down
 - See `docs/api-key-auth.md` for full design and integration details
 - Generate keys: `./scripts/generate_api_key.sh <identifier> [expires_days]`
 - Protect FastAPI routes: add `Depends(verify_api_key)`
+- The API gateway also enforces API key checks in middleware for protected routes
 
 ---
 
@@ -187,15 +188,29 @@ uv pip install --python .venv/bin/python fastapi uvicorn python-multipart
 
 ```bash
 source .venv/bin/activate
-uvicorn app.main:app --app-dir services/api-gateway --reload --port 8000
+PYTHONPATH=services/api-gateway:. uvicorn app.main:app --app-dir services/api-gateway --reload --port 8000
 ```
+
+This repo-root command needs both import roots:
+
+- `services/api-gateway` so `app.main` resolves
+- `.` so shared modules like `shared.database.models` and `services.auth_service` resolve
+
+Without the extra `PYTHONPATH`, `uvicorn --app-dir` adds only `services/api-gateway` to Python's import path, which causes `ModuleNotFoundError: No module named 'shared'`.
 
 **Option B — from inside the service directory**:
 
 ```bash
 source .venv/bin/activate
 cd services/api-gateway
-uvicorn app.main:app --reload --port 8000
+PYTHONPATH=../.. uvicorn app.main:app --reload --port 8000
+```
+
+**Option C — use the repo launcher**:
+
+```bash
+source .venv/bin/activate
+.venv/bin/python main.py
 ```
 
 **Option C — start workers + API together** (single command):
@@ -219,43 +234,74 @@ The server will be available at **http://localhost:8000**.
 
 ### Interactive API docs
 
-| URL | Description |
-|-----|-------------|
-| http://localhost:8000/docs | Swagger UI (try endpoints interactively) |
-| http://localhost:8000/redoc | ReDoc documentation |
-| http://localhost:8000/openapi.json | Raw OpenAPI schema |
+| URL                                | Description                              |
+| ---------------------------------- | ---------------------------------------- |
+| http://localhost:8000/docs         | Swagger UI (try endpoints interactively) |
+| http://localhost:8000/redoc        | ReDoc documentation                      |
+| http://localhost:8000/openapi.json | Raw OpenAPI schema                       |
 
 ### Available endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/auth/register` | Register a new application |
-| `POST` | `/auth/login` | Login and receive a JWT token |
-| `GET` | `/auth/verify` | Verify an API key or JWT token |
-| `POST` | `/auth/api-key` | Generate a new API key |
-| `POST` | `/audio` | Upload an audio file for processing |
-| `GET` | `/audio/{audio_id}` | Poll processing status and results |
-| `GET` | `/health` | Health check |
+| Method   | Path                | Description                         |
+| -------- | ------------------- | ----------------------------------- |
+| `POST`   | `/auth/register`    | Register a new application          |
+| `POST`   | `/auth/login`       | Login and receive a JWT token       |
+| `POST`   | `/auth/api-key`     | Generate an API key from a JWT      |
+| `DELETE` | `/auth/api-key`     | Revoke the active API key           |
+| `GET`    | `/auth/verify`      | Verify an API key                   |
+| `POST`   | `/audio`            | Upload an audio file for processing |
+| `GET`    | `/audio/{audio_id}` | Poll processing status and results  |
+| `GET`    | `/health`           | Health check                        |
+
+### Auth rules
+
+- Public routes: `/health`, `/docs`, `/openapi.json`, `/redoc`, `/auth/register`, `/auth/login`
+- JWT bearer token routes: `POST /auth/api-key`, `DELETE /auth/api-key`
+- API key routes: `GET /auth/verify`, `POST /audio`, `GET /audio/{audio_id}`
+- Protected requests are enforced at the API gateway middleware layer, and the audio routes also declare API key security in OpenAPI so Swagger shows lock icons
 
 ### Quick smoke test with curl
 
 ```bash
-# Register
+# Register an app
 curl -s -X POST http://localhost:8000/auth/register \
   -H "Content-Type: application/json" \
   -d '{"name":"my_app","email":"test@example.com"}'
 
-# Login
-curl -s -X POST http://localhost:8000/auth/login \
+# Login and capture JWT
+LOGIN_RESPONSE=$(curl -s -X POST http://localhost:8000/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com"}'
+   -d '{"email":"test@example.com"}')
 
-# Upload audio (requires X-API-Key or Authorization header)
+JWT_TOKEN=$(printf '%s' "$LOGIN_RESPONSE" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+
+# Generate an API key from the JWT
+API_KEY_RESPONSE=$(curl -s -X POST http://localhost:8000/auth/api-key \
+   -H "Authorization: Bearer $JWT_TOKEN")
+
+API_KEY=$(printf '%s' "$API_KEY_RESPONSE" | sed -n 's/.*"api_key":"\([^"]*\)".*/\1/p')
+
+# Verify the API key
+curl -s http://localhost:8000/auth/verify \
+   -H "X-API-Key: $API_KEY"
+
+# Upload audio with the API key
 curl -s -X POST http://localhost:8000/audio \
-  -H "X-API-Key: my_key" \
+   -H "X-API-Key: $API_KEY" \
   -F "file=@/path/to/audio.wav"
 
 # Poll status
 curl -s http://localhost:8000/audio/<audio_id> \
-  -H "X-API-Key: my_key"
+   -H "X-API-Key: $API_KEY"
+
+# Revoke the API key
+curl -s -X DELETE http://localhost:8000/auth/api-key \
+   -H "Authorization: Bearer $JWT_TOKEN"
 ```
+
+Auth flow summary:
+
+- Use `/auth/register` to create an app record.
+- Use `/auth/login` to get a JWT bearer token.
+- Use that JWT only for `/auth/api-key` create and revoke operations.
+- Use the API key in `X-API-Key` for protected routes such as `/audio` and `/auth/verify`.
