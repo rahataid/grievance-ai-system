@@ -21,6 +21,7 @@ dependencies = [
     "SQLAlchemy>=2.0.44",
     "uvicorn>=0.46.0",
     "aio-pika>=9.6.2",
+    "greenlet>=2.0.0",
 ]
 
 [tool.setuptools]

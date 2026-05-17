@@ -9,6 +9,7 @@ from alembic import context
 
 # Import your models and config
 from config import settings
+from shared.database import Base
 from shared.database import models
 
 # this is the Alembic Config object, which provides
@@ -16,7 +17,7 @@ from shared.database import models
 config = context.config
 
 # Set the database URL from settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", settings.async_database_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -25,7 +26,9 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-target_metadata = models.Base.metadata
+# Import shared.database.models to ensure all model classes are loaded
+# and registered with Base before Alembic inspects metadata.
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
