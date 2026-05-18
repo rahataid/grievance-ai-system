@@ -12,6 +12,9 @@ from app.config import (
     ROUTING_KEY_NON_EN
 )
 from app.processor.detector import detect_language
+from shared.utils.logger import get_queue_logger
+
+queue_logger = get_queue_logger()
 
 
 async def process_message(message: aio_pika.IncomingMessage, exchange):
@@ -48,6 +51,18 @@ async def process_message(message: aio_pika.IncomingMessage, exchange):
             routing_key=routing_key
         )
 
+        queue_logger.info(
+            "Published language detection event",
+            extra={
+                "service": "language-service",
+                "queue": QUEUE_NAME,
+                "exchange": EXCHANGE_NAME,
+                "routing_key": routing_key,
+                "request_id": data.get("request_id"),
+                "event": "publish.success",
+            },
+        )
+
 
 async def main():
     connection = await aio_pika.connect_robust(RABBIT_URL)
@@ -65,6 +80,16 @@ async def main():
 
     # 👇 listens to ASR output
     await queue.bind(exchange, routing_key=ROUTING_KEY_IN)
+    queue_logger.info(
+        "Queue bound to exchange",
+        extra={
+            "service": "language-service",
+            "queue": QUEUE_NAME,
+            "exchange": EXCHANGE_NAME,
+            "routing_key": ROUTING_KEY_IN,
+            "event": "queue.bind",
+        },
+    )
 
     await queue.consume(lambda msg: process_message(msg, exchange))
 

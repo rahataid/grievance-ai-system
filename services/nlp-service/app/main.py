@@ -11,6 +11,9 @@ from app.config import (
     ROUTING_KEY_OUT
 )
 from app.processor.main import analyze
+from shared.utils.logger import get_queue_logger
+
+queue_logger = get_queue_logger()
 
 
 async def process_message(message: aio_pika.IncomingMessage, exchange):
@@ -39,6 +42,18 @@ async def process_message(message: aio_pika.IncomingMessage, exchange):
             routing_key=ROUTING_KEY_OUT
         )
 
+        queue_logger.info(
+            "Published NLP event",
+            extra={
+                "service": "nlp-service",
+                "queue": QUEUE_NAME,
+                "exchange": EXCHANGE_NAME,
+                "routing_key": ROUTING_KEY_OUT,
+                "request_id": data.get("request_id"),
+                "event": "publish.success",
+            },
+        )
+
         print(f"🧠 NLP done → {result}")
 
 
@@ -58,6 +73,16 @@ async def main():
 
     # 👇 listens to translated text
     await queue.bind(exchange, routing_key=ROUTING_KEY_IN)
+    queue_logger.info(
+        "Queue bound to exchange",
+        extra={
+            "service": "nlp-service",
+            "queue": QUEUE_NAME,
+            "exchange": EXCHANGE_NAME,
+            "routing_key": ROUTING_KEY_IN,
+            "event": "queue.bind",
+        },
+    )
 
     await queue.consume(lambda msg: process_message(msg, exchange))
 
