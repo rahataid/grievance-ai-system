@@ -68,6 +68,25 @@ async def _publish_audio_event(payload: dict) -> None:
         await connection.close()
 
 
+import uuid
+from pathlib import Path
+
+
+
+BASE_DIR = Path("/Users/rumsan/Documents/apps/grievance-ai-system")
+
+UPLOAD_DIR = BASE_DIR / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+def save_file(file_bytes: bytes, audio_filename: str) -> str:
+    unique_name = f"{uuid.uuid4()}_{audio_filename}"
+    file_path = UPLOAD_DIR / unique_name
+
+    with open(file_path, "wb") as f:
+        f.write(file_bytes)
+    return str(file_path)
+
+
 @router.post(
     "",
     response_model=UploadAudioResponse,
@@ -88,8 +107,14 @@ async def upload_audio(
 
     payload = {
         "request_id": audio_id,
-        "audio_filename": file.filename or f"{audio_id}.wav",
-        "audio_bytes": audio_bytes.decode("latin1"),
+        "audio_filename": file.filename or f"{audio_id}.wav"
+
+    }
+    file_path= save_file( audio_bytes, payload["audio_filename"])
+    payload = {
+        "request_id": audio_id,
+        "audio_filename":file_path
+
     }
 
     queue_logger.info(

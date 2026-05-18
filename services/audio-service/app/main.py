@@ -31,24 +31,23 @@ async def process_message(message: aio_pika.IncomingMessage, exchange):
         )
 
         audio_filename = data["audio_filename"]
-        audio_bytes = data["audio_bytes"].encode("latin1")
+       
 
-        # 1. Save file
-        file_path = save_file(audio_bytes, audio_filename)
+
         queue_logger.info(
             "Saved uploaded audio file",
             extra={
                 "service": "audio-service",
                 "queue": QUEUE_NAME,
                 "exchange": EXCHANGE_NAME,
-                "file_path": file_path,
+                "file_path": audio_filename,
                 "request_id": data.get("request_id"),
                 "event": "file.saved",
             },
         )
 
         # 2. Convert
-        wav_path = convert_to_wav(file_path)
+        wav_path = convert_to_wav(audio_filename)
         queue_logger.info(
             "Converted audio to WAV",
             extra={
