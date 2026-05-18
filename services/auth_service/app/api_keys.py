@@ -37,6 +37,10 @@ def hash_api_key(raw_key: str) -> str:
     """SHA-256 hash of the raw API key."""
     return hashlib.sha256(raw_key.encode()).hexdigest()
 
+
+def utcnow_naive() -> datetime:
+    return datetime.utcnow()
+
 async def verify_api_key(
     api_key: str = Security(API_KEY_HEADER),
     db: AsyncSession = Depends(get_db),
@@ -60,12 +64,12 @@ async def verify_api_key(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or inactive API key",
         )
-    if record.expires_on and record.expires_on < datetime.utcnow():
+    if record.expires_on and record.expires_on < utcnow_naive():
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="API key has expired",
         )
-    record.last_used_at = datetime.utcnow()
+    record.last_used_at = utcnow_naive()
     await db.commit()
     logger.info(f"Authenticated: {record.identifier}")
     # Parse scopes (assume comma-separated or JSON string)

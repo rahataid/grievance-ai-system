@@ -11,6 +11,7 @@ class APIKey(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     identifier = Column(String, nullable=False)
+
     api_key_hash = Column(String, nullable=False)
 
     is_active = Column(Boolean, default=True)
@@ -18,6 +19,7 @@ class APIKey(Base):
     expires_on = Column(DateTime, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
+    
     last_used_at = Column(DateTime, nullable=True)
 
     app_id = Column(String, nullable=True)

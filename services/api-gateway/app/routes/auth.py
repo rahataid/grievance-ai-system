@@ -1,8 +1,7 @@
 import uuid
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,16 +10,16 @@ from app.schemas import (
     RegisterResponse,
     LoginRequest,
     LoginResponse,
+    CreateApiKeyRequest,
     RevokeApiKeyResponse,
-    VerifyResponse,
     CreateApiKeyResponse,
 )
+from services.auth_service.app.password_security import hash_password, verify_password
 from shared.database.models import APIKey, App
 from shared.database.session import get_db
 from services.auth_service.app.api_keys import hash_api_key
 from services.auth_service.app.jwt import create_access_token, decode_access_token
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from services.auth_service.app.api_keys import verify_api_key, AuthContext
 
 bearer_scheme = HTTPBearer()
 
@@ -50,6 +49,7 @@ async def register(
         id=uuid.uuid4(),
         name=body.name,
         email=body.email,
+        hashed_password=hash_password(body.password),
         is_verified=True,
     )
     db.add(app)
@@ -71,21 +71,40 @@ async def login(
     """
     Login with a registered email and receive a JWT access token.
     """
+
     result = await db.execute(
         select(App).where(
             App.email == body.email,
             App.is_verified.is_(True),
         )
     )
+
     app = result.scalar_one_or_none()
+
     if app is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or unverified application",
+            detail="Invalid email or password",
         )
 
-    access_token = create_access_token(subject=str(app.id), claims={"email": app.email, "app_name": app.name})
-    return LoginResponse(access_token=access_token, token_type="bearer")
+    if not verify_password(body.password, app.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    access_token = create_access_token(
+        subject=str(app.id),
+        claims={
+            "email": app.email,
+            "app_name": app.name,
+        },
+    )
+
+    return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
+    )
 
 
 @router.post(
@@ -96,6 +115,7 @@ async def login(
     responses={401: {"description": "Unauthorized"}},
 )
 async def create_api_key(
+    body: CreateApiKeyRequest | None = None,
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ):
@@ -137,12 +157,16 @@ async def create_api_key(
         )
 
     raw_api_key = str(uuid.uuid4())
+    expires_on = None
+    if body and body.expires_in_days is not None:
+        expires_on = datetime.utcnow() + timedelta(days=body.expires_in_days)
+
     api_key = APIKey(
         identifier=app.name,
         api_key_hash=hash_api_key(raw_api_key),
         is_active=True,
-        expires_on=None,
-        created_at=datetime.now(datetime.utcnow().tzinfo),
+        expires_on=expires_on,
+        created_at=datetime.utcnow(),
         last_used_at=None,
         app_id=str(app.id),
         scopes=None,
@@ -152,7 +176,10 @@ async def create_api_key(
     await db.commit()
     await db.refresh(api_key)
 
-    return CreateApiKeyResponse(api_key=raw_api_key)
+    return CreateApiKeyResponse(
+        api_key=raw_api_key,
+        expires_on=api_key.expires_on,
+    )
 
 
 @router.delete(
@@ -204,17 +231,3 @@ async def revoke_api_key(
 
     return RevokeApiKeyResponse(message="API key revoked successfully")
 
-
-@router.get(
-    "/verify",
-    response_model=VerifyResponse,
-    summary="Verify an API key",
-    responses={401: {"description": "Unauthorized"}},
-)
-async def verify(
-    auth: AuthContext = Depends(verify_api_key),
-):
-    """
-    Verify the validity of an API key.
-    """    
-    return VerifyResponse(status="valid", app=auth.identifier)

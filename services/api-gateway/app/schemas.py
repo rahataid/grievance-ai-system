@@ -1,6 +1,8 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional
+from datetime import datetime
 from enum import Enum
+from typing import Optional
+
+from pydantic import BaseModel, EmailStr, field_validator
 
 
 # ── Enums ──────────────────────────────────────────────────────────────────────
@@ -28,6 +30,7 @@ class PipelineStage(str, Enum):
 class RegisterRequest(BaseModel):
     name: str
     email: EmailStr
+    password: str
 
 
 class RegisterResponse(BaseModel):
@@ -36,24 +39,107 @@ class RegisterResponse(BaseModel):
 
 class LoginRequest(BaseModel):
     email: EmailStr
-
+    password: str
 
 class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
 
-class VerifyResponse(BaseModel):
-    status: str
-    app: str
+class CreateApiKeyRequest(BaseModel):
+    expires_in_days: Optional[int] = None
 
+    @field_validator("expires_in_days")
+    @classmethod
+    def validate_expires_in_days(cls, value: Optional[int]) -> Optional[int]:
+        if value is None:
+            return value
+
+        if value <= 0:
+            raise ValueError("expires_in_days must be greater than 0")
+
+        return value
 
 class CreateApiKeyResponse(BaseModel):
     api_key: str
+    expires_on: Optional[datetime] = None
 
 
 class RevokeApiKeyResponse(BaseModel):
     message: str
+
+
+class MessageResponse(BaseModel):
+    message: str
+
+
+class AppResponse(BaseModel):
+    id: str
+    name: str
+    email: str
+    is_verified: bool
+
+
+class AppUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    is_verified: Optional[bool] = None
+
+
+class CategoryUpdateRequest(BaseModel):
+    categories: Optional[dict | list] = None
+
+
+class CategoryResponse(BaseModel):
+    id: int
+    app_id: str
+    categories: dict | list
+
+
+class AudioResponse(BaseModel):
+    id: str
+    app_id: str
+    url: str
+    status: str
+    current_stage: str
+
+
+class AudioUpdateRequest(BaseModel):
+    url: Optional[str] = None
+    status: Optional[str] = None
+    current_stage: Optional[str] = None
+
+
+class GrievanceResponse(BaseModel):
+    id: str
+    audio_id: str
+    beneficiary_id: str
+    confidence: Optional[float] = None
+    transcript: str
+    language: str
+    grievance_detected: bool
+    category: Optional[str] = None
+    sentiment: Optional[str] = None
+    urgency: Optional[str] = None
+    severity_score: Optional[float] = None
+    recommended_action: Optional[str] = None
+    keywords: Optional[list] = None
+    created_at: datetime
+    updated_at: datetime
+    api_key_id: Optional[int] = None
+
+
+class GrievanceUpdateRequest(BaseModel):
+    transcript: Optional[str] = None
+    language: Optional[str] = None
+    confidence: Optional[float] = None
+    grievance_detected: Optional[bool] = None
+    category: Optional[str] = None
+    sentiment: Optional[str] = None
+    urgency: Optional[str] = None
+    severity_score: Optional[float] = None
+    recommended_action: Optional[str] = None
+    keywords: Optional[list] = None
 
 # ── Audio schemas ──────────────────────────────────────────────────────────────
 
