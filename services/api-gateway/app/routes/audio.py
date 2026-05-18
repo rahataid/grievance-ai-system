@@ -88,7 +88,7 @@ async def upload_audio(
 
     payload = {
         "request_id": audio_id,
-        "filename": file.filename or f"{audio_id}.wav",
+        "audio_filename": file.filename or f"{audio_id}.wav",
         "audio_bytes": audio_bytes.decode("latin1"),
     }
 
@@ -98,7 +98,7 @@ async def upload_audio(
             "service": "api-gateway",
             "source": "upload_audio",
             "queue_request_id": audio_id,
-            "queue_filename": payload["filename"],
+            "queue_audio_filename": payload["audio_filename"],
             "exchange": EXCHANGE_NAME,
             "queue_routing_key": ENTRY_ROUTING_KEY,
             "event": "publish.attempt",
@@ -115,7 +115,7 @@ async def upload_audio(
                 "service": "api-gateway",
                 "source": "upload_audio",
                 "queue_request_id": audio_id,
-                "queue_filename": payload["filename"],
+                "queue_audio_filename": payload["audio_filename"],
                 "exchange": EXCHANGE_NAME,
                 "queue_routing_key": ENTRY_ROUTING_KEY,
                 "event": "publish.failure",
@@ -132,7 +132,7 @@ async def upload_audio(
             "service": "api-gateway",
             "source": "upload_audio",
             "queue_request_id": audio_id,
-            "queue_filename": payload["filename"],
+            "queue_audio_filename": payload["audio_filename"],
             "exchange": EXCHANGE_NAME,
             "queue_routing_key": ENTRY_ROUTING_KEY,
             "event": "publish.success",
@@ -165,6 +165,16 @@ async def get_audio_status(
 
     Poll this endpoint until `status` is `completed` or `failed`.
     """
+    queue_logger.info(
+        "Audio status requested",
+        extra={
+            "service": "api-gateway",
+            "source": "get_audio_status",
+            "audio_id": audio_id,
+            "event": "status.query",
+        },
+    )
+
     # TODO: query persistence-service for the audio record
     return AudioStatusResponse(
         audio_id=audio_id,

@@ -7,6 +7,9 @@ set -e
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export RABBIT_URL="${RABBIT_URL:-amqp://sentiment:password@localhost:5672/}"
+export HF_HUB_DISABLE_PROGRESS_BARS=1
+export TRANSFORMERS_NO_PROGRESS_BAR=1
+export HF_HUB_DISABLE_TELEMETRY=1
 PYTHON_BIN="${PYTHON_BIN:-$ROOT/.venv/bin/python}"
 
 SERVICES=(

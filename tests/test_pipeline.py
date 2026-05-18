@@ -28,7 +28,7 @@ async def main():
     # Minimal payload — simulates what the API Gateway would publish
     payload = {
         "request_id": "test-001",
-        "filename": "test_audio.wav",
+        "audio_filename": "test_audio.wav",
         # Use a small WAV header so audio-service can save it as a valid file
         # (8 bytes of fake audio bytes encoded as latin1-safe string)
         "audio_bytes": b"RIFF\x00\x00\x00\x00WAVE".decode("latin1"),
