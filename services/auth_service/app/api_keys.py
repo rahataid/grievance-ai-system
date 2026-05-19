@@ -1,14 +1,17 @@
-import hashlib
+import base64
 import json
 import logging
 from datetime import datetime
+from functools import lru_cache
 from typing import List, Optional
 
+from cryptography.fernet import Fernet, InvalidToken
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.auth_service.config import settings
 from shared.database.models import APIKey
 from shared.database.session import get_db
 
@@ -33,13 +36,47 @@ class AuthContext:
             "identifier": self.identifier,
         }
 
-def hash_api_key(raw_key: str) -> str:
-    """SHA-256 hash of the raw API key."""
-    return hashlib.sha256(raw_key.encode()).hexdigest()
+
+
+@lru_cache(maxsize=1)
+def get_api_key_cipher() -> Fernet:
+    secret = settings.API_KEY_ENCRYPTION_SECRET
+    if not secret:
+        raise RuntimeError("API_KEY_ENCRYPTION_SECRET must be set")
+
+    try:
+        secret_bytes = secret.encode("utf-8")
+        normalized_key = base64.urlsafe_b64encode(secret_bytes[:32].ljust(32, b"0"))
+        return Fernet(normalized_key)
+    except (ValueError, TypeError, base64.binascii.Error) as exc:
+        raise RuntimeError(
+            "API_KEY_ENCRYPTION_SECRET could not be converted into an encryption key"
+        ) from exc
+
+
+def encrypt_api_key(raw_key: str) -> str:
+    return get_api_key_cipher().encrypt(raw_key.encode("utf-8")).decode("utf-8")
+
+
+def decrypt_api_key(encrypted_key: str) -> str:
+    return get_api_key_cipher().decrypt(encrypted_key.encode("utf-8")).decode("utf-8")
 
 
 def utcnow_naive() -> datetime:
     return datetime.utcnow()
+
+
+async def get_api_key_record(api_key: str, db: AsyncSession) -> Optional[APIKey]:
+    result = await db.execute(select(APIKey).where(APIKey.is_active.is_(True)))
+    for record in result.scalars():
+        try:
+            if decrypt_api_key(record.api_key_hash) == api_key:
+                return record
+        except InvalidToken:
+            continue
+
+    return None
+
 
 async def verify_api_key(
     api_key: str = Security(API_KEY_HEADER),
@@ -51,14 +88,7 @@ async def verify_api_key(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing X-API-Key header",
         )
-    key_hash = hash_api_key(api_key)
-    result = await db.execute(
-        select(APIKey).where(
-            APIKey.api_key_hash == key_hash,
-            APIKey.is_active.is_(True),
-        )
-    )
-    record = result.scalar_one_or_none()
+    record = await get_api_key_record(api_key=api_key, db=db)
     if not record:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
