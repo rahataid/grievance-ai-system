@@ -4,6 +4,9 @@ import json
 import aio_pika
 from app.config import RABBIT_URL, EXCHANGE, QUEUE, IN_KEY, OUT_KEY
 from app.processor.urgency import compute_urgency
+from shared.utils.logger import get_queue_logger
+
+queue_logger = get_queue_logger()
 
 
 
@@ -27,6 +30,18 @@ async def process(message, exchange):
             routing_key=OUT_KEY
         )
 
+        queue_logger.info(
+            "Published urgency event",
+            extra={
+                "service": "urgency-service",
+                "queue": QUEUE,
+                "exchange": EXCHANGE,
+                "routing_key": OUT_KEY,
+                "request_id": data.get("request_id"),
+                "event": "publish.success",
+            },
+        )
+
         print("⚡ urgency:", urgency)
 
 
@@ -39,6 +54,16 @@ async def main():
 
     queue = await ch.declare_queue(QUEUE, durable=True)
     await queue.bind(exchange, routing_key=IN_KEY)
+    queue_logger.info(
+        "Queue bound to exchange",
+        extra={
+            "service": "urgency-service",
+            "queue": QUEUE,
+            "exchange": EXCHANGE,
+            "routing_key": IN_KEY,
+            "event": "queue.bind",
+        },
+    )
 
     await queue.consume(lambda m: process(m, exchange))
 

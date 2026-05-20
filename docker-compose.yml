@@ -4,6 +4,8 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    env_file:
+      - .env
     environment:
       RABBITMQ_DEFAULT_USER: user
       RABBITMQ_DEFAULT_PASS: password
@@ -15,6 +17,8 @@ services:
     ports:
       - "6379:6379"
     command: ["redis-server", "--appendonly", "no"]
+    env_file:
+      - .env
 
   postgres:
     image: postgres:14

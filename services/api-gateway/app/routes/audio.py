@@ -22,11 +22,22 @@ from shared.database.session import get_db
 from shared.database.models.audio import Audio
 from services.auth_service.app.api_keys import API_KEY_HEADER
 from services.crud import audio as audio_crud
+from shared.utils.logger import get_queue_logger
 
+queue_logger = get_queue_logger()
 router = APIRouter(prefix="/audio", tags=["Audio"])
 
 
 async def _publish_audio_event(payload: dict) -> None:
+    queue_logger.info(
+        "Opening RabbitMQ connection",
+        extra={
+            "service": "api-gateway",
+            "exchange": EXCHANGE_NAME,
+            "routing_key": ENTRY_ROUTING_KEY,
+            "event": "publish.start",
+        },
+    )
     connection = await aio_pika.connect_robust(RABBIT_URL)
     channel = await connection.channel()
     exchange = await channel.declare_exchange(
@@ -34,6 +45,17 @@ async def _publish_audio_event(payload: dict) -> None:
         aio_pika.ExchangeType.TOPIC,
         durable=True,
     )
+
+    queue_logger.info(
+        "Exchange ready for publish",
+        extra={
+            "service": "api-gateway",
+            "exchange": EXCHANGE_NAME,
+            "routing_key": ENTRY_ROUTING_KEY,
+            "event": "exchange.declared",
+        },
+    )
+
     try:
         await exchange.publish(
             aio_pika.Message(
@@ -41,6 +63,16 @@ async def _publish_audio_event(payload: dict) -> None:
                 delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
             ),
             routing_key=ENTRY_ROUTING_KEY,
+        )
+        queue_logger.info(
+            "Exchange publish success",
+            extra={
+                "service": "api-gateway",
+                "exchange": EXCHANGE_NAME,
+                "routing_key": ENTRY_ROUTING_KEY,
+                "event": "publish.success",
+                "request_id": payload.get("request_id"),
+            },
         )
     finally:
         await connection.close()
@@ -71,21 +103,56 @@ async def upload_audio(
         "audio_bytes": audio_bytes.decode("latin1"),
     }
 
+    queue_logger.info(
+        "Publishing audio upload event",
+        extra={
+            "service": "api-gateway",
+            "source": "upload_audio",
+            "queue_request_id": audio_id,
+            "queue_filename": payload["filename"],
+            "exchange": EXCHANGE_NAME,
+            "queue_routing_key": ENTRY_ROUTING_KEY,
+            "event": "publish.attempt",
+        },
+    )
+
     try:
         await _publish_audio_event(payload)
     except Exception as exc:
+        queue_logger.error(
+            "Failed to publish audio event",
+            exc_info=True,
+            extra={
+                "service": "api-gateway",
+                "source": "upload_audio",
+                "queue_request_id": audio_id,
+                "queue_filename": payload["filename"],
+                "exchange": EXCHANGE_NAME,
+                "queue_routing_key": ENTRY_ROUTING_KEY,
+                "event": "publish.failure",
+            },
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to publish audio: {exc}",
         ) from exc
 
-    # Persist to DB 
-    audio_record = Audio(
-        id=audio_id,
-        app_id=_api_key.app_id if hasattr(_api_key, "app_id") else None, 
-        url=f"/audio/{filename}",
-        status=AudioStatus.uploaded.value,
-        current_stage=PipelineStage.asr_service.value,
+    queue_logger.info(
+        "Published audio upload event",
+        extra={
+            "service": "api-gateway",
+            "source": "upload_audio",
+            "queue_request_id": audio_id,
+            "queue_filename": payload["filename"],
+            "exchange": EXCHANGE_NAME,
+            "queue_routing_key": ENTRY_ROUTING_KEY,
+            "event": "publish.success",
+        },
+    )
+
+    return UploadAudioResponse(
+        audio_id=audio_id,
+        status=AudioStatus.uploaded,
     )
     db.add(audio_record)
     await db.commit()
