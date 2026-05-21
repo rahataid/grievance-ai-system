@@ -1,4 +1,5 @@
 from typing import Optional
+import uuid
  
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -38,6 +39,27 @@ async def get_all_audios(
 ) -> list[Audio]:
     result = await db.execute(select(Audio).offset(skip).limit(limit))
     return result.scalars().all()
+ 
+ 
+async def create_audio(
+    db: AsyncSession,
+    audio_id: str,
+    app_id: str,
+    url: str,
+    status: str,
+    current_stage: str,
+) -> Audio:
+    audio = Audio(
+        id=uuid.UUID(audio_id),
+        app_id=app_id,
+        url=url,
+        status=status,
+        current_stage=current_stage,
+    )
+    db.add(audio)
+    await db.commit()
+    await db.refresh(audio)
+    return audio
  
  
 async def update_audio(

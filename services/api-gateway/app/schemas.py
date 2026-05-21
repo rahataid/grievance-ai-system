@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Optional,Any
 
 from pydantic import BaseModel, EmailStr, field_validator
 
@@ -96,6 +96,11 @@ class CategoryResponse(BaseModel):
     categories: dict | list
 
 
+
+
+class CategoryCreateRequest(BaseModel):
+    app_id: str
+    categories: list[str] | dict[str, Any]
 class AudioResponse(BaseModel):
     id: str
     app_id: str

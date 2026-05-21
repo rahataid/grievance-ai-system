@@ -11,7 +11,9 @@ from app.config import (
     ROUTING_KEY_OUT
 )
 from app.processor.translator import translate
+from shared.database.session import SessionLocal
 from shared.utils.logger import get_queue_logger
+from services.crud import audio as audio_crud
 
 queue_logger = get_queue_logger()
 
@@ -19,6 +21,15 @@ queue_logger = get_queue_logger()
 async def process_message(message: aio_pika.IncomingMessage, exchange):
     async with message.process():
         data = json.loads(message.body.decode())
+        audio_id = data.get("request_id")
+
+        async with SessionLocal() as db:
+            await audio_crud.update_audio(
+                db=db,
+                audio_id=audio_id,
+                status="processing",
+                current_stage="translation_service",
+            )
 
         text = data.get("transcript")
         lang = data.get("language")

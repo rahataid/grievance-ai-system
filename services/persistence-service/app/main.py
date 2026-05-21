@@ -12,22 +12,41 @@ queue_logger = get_queue_logger()
 async def process(message, exchange):
     async with message.process():
         data = json.loads(message.body.decode())
+        audio_id = data.get("request_id")
 
-        await save_to_db(data)
+        try:
+            await save_to_db(data)
 
-        queue_logger.info(
-            "Persisted message",
-            extra={
-                "service": "persistence-service",
-                "queue": QUEUE,
-                "exchange": EXCHANGE,
-                "routing_key": IN_KEY,
-                "request_id": data.get("request_id"),
-                "event": "process.success",
-            },
-        )
+            queue_logger.info(
+                "Persisted message",
+                extra={
+                    "service": "persistence-service",
+                    "queue": QUEUE,
+                    "exchange": EXCHANGE,
+                    "routing_key": IN_KEY,
+                    "request_id": audio_id,
+                    "event": "process.success",
+                },
+            )
 
-        print("✅ persisted:", data["request_id"])
+            print("✅ persisted:", audio_id)
+
+        except Exception as e:
+            queue_logger.error(
+                "Failed to persist message",
+                exc_info=True,
+                extra={
+                    "service": "persistence-service",
+                    "queue": QUEUE,
+                    "exchange": EXCHANGE,
+                    "routing_key": IN_KEY,
+                    "request_id": audio_id,
+                    "event": "process.failure",
+                    "error": str(e),
+                },
+            )
+            print(f"❌ Failed to persist: {e}")
+            raise
 
 
 async def main():

@@ -4,7 +4,9 @@ import json
 import aio_pika
 from app.config import RABBIT_URL, EXCHANGE, QUEUE, IN_KEY, OUT_KEY
 from app.processor.urgency import compute_urgency
+from shared.database.session import SessionLocal
 from shared.utils.logger import get_queue_logger
+from services.crud import audio as audio_crud
 
 queue_logger = get_queue_logger()
 
@@ -13,6 +15,15 @@ queue_logger = get_queue_logger()
 async def process(message, exchange):
     async with message.process():
         data = json.loads(message.body.decode())
+        audio_id = data.get("request_id")
+
+        async with SessionLocal() as db:
+            await audio_crud.update_audio(
+                db=db,
+                audio_id=audio_id,
+                status="processing",
+                current_stage="urgency_service",
+            )
 
         urgency = compute_urgency(
             data.get("sentiment"),

@@ -6,7 +6,9 @@ import aio_pika
 from app.config import RABBIT_URL, EXCHANGE_NAME, AUDIO_UPLOADED
 from app.processor.audio_processor import convert_to_wav
 from app.utils.file_handler import save_file
+from shared.database.session import SessionLocal
 from shared.utils.logger import get_queue_logger
+from services.crud import audio as audio_crud
 
 queue_logger = get_queue_logger()
 
@@ -16,6 +18,7 @@ QUEUE_NAME = "audio.upload_queue"
 async def process_message(message: aio_pika.IncomingMessage, exchange):
     async with message.process():
         data = json.loads(message.body.decode())
+        audio_id = data.get("request_id")
 
         queue_logger.info(
             "Received raw audio upload message",
@@ -24,15 +27,21 @@ async def process_message(message: aio_pika.IncomingMessage, exchange):
                 "queue": QUEUE_NAME,
                 "exchange": EXCHANGE_NAME,
                 "routing_key": "audio.raw",
-                "request_id": data.get("request_id"),
+                "request_id": audio_id,
                 "audio_filename": data.get("audio_filename"),
                 "event": "process.start",
             },
         )
 
-        audio_filename = data["audio_filename"]
-       
+        async with SessionLocal() as db:
+            await audio_crud.update_audio(
+                db=db,
+                audio_id=audio_id,
+                status="processing",
+                current_stage="audio_service",
+            )
 
+        audio_filename = data["audio_filename"]
 
         queue_logger.info(
             "Saved uploaded audio file",
@@ -41,7 +50,7 @@ async def process_message(message: aio_pika.IncomingMessage, exchange):
                 "queue": QUEUE_NAME,
                 "exchange": EXCHANGE_NAME,
                 "file_path": audio_filename,
-                "request_id": data.get("request_id"),
+                "request_id": audio_id,
                 "event": "file.saved",
             },
         )

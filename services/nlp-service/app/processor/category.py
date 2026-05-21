@@ -50,14 +50,14 @@ def _get_classifier():
     return _classifier
 
 
-def classify_grievance(text: str) -> dict:
+def classify_grievance(text: str, category: list[str]) -> dict:
     """Classify text into a grievance category using zero-shot classification.
 
     Returns:
         dict with 'category' (label) and 'confidence' (0-1 score).
     """
     pipe = _get_classifier()
-    result = pipe(text[:512], GRIEVANCE_LABELS)
+    result = pipe(text[:512], category)
     category = result["labels"][0]
     confidence = round(float(result["scores"][0]), 4)
     logger.info(f"Category: {category} ({confidence:.3f})")

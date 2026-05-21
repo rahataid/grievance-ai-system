@@ -1,4 +1,5 @@
 from typing import Optional
+import uuid
  
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +10,44 @@ from shared.database.models import Grievance
 async def get_grievance(db: AsyncSession, grievance_id: str) -> Optional[Grievance]:
     result = await db.execute(select(Grievance).where(Grievance.id == grievance_id))
     return result.scalar_one_or_none()
+ 
+ 
+async def create_grievance(
+    db: AsyncSession,
+    audio_id: str,
+    beneficiary_id: str,
+    transcript: str,
+    language: str,
+    api_key_id: int | None = None,
+    confidence: float | None = None,
+    grievance_detected: bool | None = None,
+    category: str | None = None,
+    sentiment: str | None = None,
+    urgency: str | None = None,
+    severity_score: float | None = None,
+    recommended_action: str | None = None,
+    keywords: list | None = None,
+) -> Grievance:
+    grievance = Grievance(
+        id=uuid.uuid4(),
+        audio_id=uuid.UUID(audio_id),
+        beneficiary_id=beneficiary_id,
+        transcript=transcript,
+        language=language,
+        api_key_id=api_key_id,
+        confidence=confidence,
+        grievance_detected=grievance_detected if grievance_detected is not None else False,
+        category=category,
+        sentiment=sentiment,
+        urgency=urgency,
+        severity_score=severity_score,
+        recommended_action=recommended_action,
+        keywords=keywords,
+    )
+    db.add(grievance)
+    await db.commit()
+    await db.refresh(grievance)
+    return grievance
  
  
 async def get_grievances_by_audio(

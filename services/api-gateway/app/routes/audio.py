@@ -2,7 +2,8 @@ import json
 from uuid import uuid4
 
 import aio_pika
-from fastapi import APIRouter, Depends, File, HTTPException, Security, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Security, UploadFile, status
+from fastapi import Header
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -17,7 +18,10 @@ from app.schemas import (
     AudioStatusResponse,
     GrievanceData,
     MessageResponse,
+    CategoryResponse
 )
+from shared.database.models import Category
+from services.crud import category as category_crud
 from shared.database.session import get_db        
 from shared.database.models.audio import Audio
 from services.auth_service.app.api_keys import API_KEY_HEADER
@@ -27,7 +31,12 @@ from shared.utils.logger import get_queue_logger
 queue_logger = get_queue_logger()
 router = APIRouter(prefix="/audio", tags=["Audio"])
 
-
+def _serialize_category(category: Category) -> CategoryResponse:
+	return CategoryResponse(
+		id=category.id,
+		app_id=str(category.app_id),
+		categories=category.categories,
+	)
 async def _publish_audio_event(payload: dict) -> None:
     queue_logger.info(
         "Opening RabbitMQ connection",
@@ -105,29 +114,52 @@ def save_file(file_bytes: bytes, audio_filename: str) -> str:
     responses={401: {"description": "Unauthorized"}},
 )
 async def upload_audio(
+    request: Request,
     file: UploadFile = File(..., description="Audio file to process"),
     _api_key: str | None = Security(API_KEY_HEADER),
+    category_id: int = Header(..., description="Category ID"),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Upload an audio file and enqueue it for grievance processing.
     """
+    auth_context = getattr(request.state, "auth_context", None)
+    if auth_context is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unable to resolve API key authentication context",
+        )
+
     audio_bytes = await file.read()
     audio_id = str(uuid4())
     filename = file.filename or f"{audio_id}.wav"
+    file_path = save_file(audio_bytes, filename)
+
+    # Persist the audio record immediately, then enqueue
+    await audio_crud.create_audio(
+        db=db,
+        audio_id=audio_id,
+        app_id=auth_context.user_id,
+        url=file_path,
+        status=AudioStatus.uploaded.value,
+        current_stage=PipelineStage.audio_service.value,
+    )
+    category = await category_crud.get_category(db, category_id)
+    if  _serialize_category(category).model_dump() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Category not found",
+        )
+
 
     payload = {
         "request_id": audio_id,
-        "audio_filename": file.filename or f"{audio_id}.wav"
-
-    }
-    file_path= save_file( audio_bytes, payload["audio_filename"])
-    payload = {
-        "request_id": audio_id,
-        "audio_filename":file_path,
-
+        "audio_filename": file_path,
         "filename": filename,
-
+        "app_id": auth_context.user_id,
+        "beneficiary_id": auth_context.identifier,
+        "api_key_id": auth_context.api_key_id,
+        "category":  category.categories,
     }
 
     queue_logger.info(
@@ -146,6 +178,12 @@ async def upload_audio(
     try:
         await _publish_audio_event(payload)
     except Exception as exc:
+        await audio_crud.update_audio(
+            db=db,
+            audio_id=audio_id,
+            status=AudioStatus.failed.value,
+            current_stage=PipelineStage.audio_service.value,
+        )
         queue_logger.error(
             "Failed to publish audio event",
             exc_info=True,

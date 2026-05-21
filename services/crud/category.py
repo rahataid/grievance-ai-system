@@ -5,6 +5,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
  
 from shared.database.models import Category
 
+
+
+async def create_category(
+    db: AsyncSession,
+    app_id,
+    categories: dict | list,
+) -> Category:
+    category = Category(
+        app_id=app_id,
+        categories=categories,
+    )
+
+    db.add(category)
+    await db.commit()
+    await db.refresh(category)
+
+    return category
+
  
 async def get_category(db: AsyncSession, category_id: int) -> Optional[Category]:
     result = await db.execute(select(Category).where(Category.id == category_id))

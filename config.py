@@ -1,9 +1,13 @@
 """Application configuration."""
 
 import logging
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
+
+BASE_DIR = Path(__file__).resolve().parent
 
 
 class Settings(BaseSettings):
@@ -13,9 +17,8 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     AUTH_CACHE_TTL_SECONDS: int = 300
 
-
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=BASE_DIR / ".env",
         extra="ignore"
     )
 
@@ -23,10 +26,17 @@ class Settings(BaseSettings):
     def async_database_url(self) -> str:
         """Return a SQLAlchemy async-compatible database URL."""
         url = self.DATABASE_URL
+
         if url.startswith("postgres://"):
             return "postgresql+asyncpg://" + url.split("://", 1)[1]
+
         if url.startswith("postgresql://") and "+asyncpg" not in url:
-            return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            return url.replace(
+                "postgresql://",
+                "postgresql+asyncpg://",
+                1
+            )
+
         return url
 
 

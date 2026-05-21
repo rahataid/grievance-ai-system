@@ -4,8 +4,8 @@ from app.processor.category import classify_grievance
 from app.processor.sentiment import analyze_emotion, analyze_sentiment, derive_urgency
 
 
-async def analyze(text: str) -> dict:
-    category_result = await asyncio.to_thread(classify_grievance, text)
+async def analyze(text: str, category: list[str]) -> dict:
+    category_result = await asyncio.to_thread(classify_grievance, text, category)
     sentiment_result = await asyncio.to_thread(analyze_sentiment, text)
     emotion_result = await asyncio.to_thread(analyze_emotion, text)
 

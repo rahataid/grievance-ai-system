@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Security, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas import (
+    CategoryCreateRequest,
 	CategoryResponse,
 	CategoryUpdateRequest,
 	MessageResponse,
@@ -20,7 +21,29 @@ def _serialize_category(category: Category) -> CategoryResponse:
 		app_id=str(category.app_id),
 		categories=category.categories,
 	)
+@router.post(
+    "",
+    response_model=CategoryResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create category",
+    responses={401: {"description": "Unauthorized"}},
+)
+async def create_category(
+    body: CategoryCreateRequest,
+    _api_key: str | None = Security(API_KEY_HEADER),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Create a new category record.
+    """
 
+    category = await category_crud.create_category(
+        db=db,
+        app_id=body.app_id,
+        categories=body.categories,
+    )
+
+    return _serialize_category(category)
 
 @router.get(
 	"",
