@@ -124,10 +124,10 @@ async def upload_audio(
     file_path= save_file( audio_bytes, payload["audio_filename"])
     payload = {
         "request_id": audio_id,
-        "audio_filename":file_path
+        "audio_filename":file_path,
 
         "filename": filename,
-        "audio_bytes": audio_bytes.decode("latin1"),
+
     }
 
     queue_logger.info(
@@ -181,10 +181,7 @@ async def upload_audio(
         audio_id=audio_id,
         status=AudioStatus.uploaded,
     )
-    db.add(audio_record)
-    await db.commit()
 
-    return UploadAudioResponse(audio_id=audio_id, status=AudioStatus.uploaded)
 
 
 @router.get(
