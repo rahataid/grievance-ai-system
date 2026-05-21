@@ -24,6 +24,15 @@ dependencies = [
     "aio-pika>=9.6.2",
     "pwdlib[argon2]>=0.3.0",
     "greenlet>=2.0.0",
+            "langchain>=0.2.0",
+    "langchain-core>=0.2.0",
+    "langchain-openai>=0.1.0",
+    "langdetect>=1.0.9",
+    "omnilingual-asr @ git+https://github.com/facebookresearch/omnilingual-asr.git",
+        "torch==2.8.0",
+    "torchaudio==2.8.0",
+    "transformers>=4.40.0",
+    
 ]
 
 [tool.setuptools]

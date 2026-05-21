@@ -17,14 +17,48 @@ async def process_message(message: aio_pika.IncomingMessage, exchange):
     async with message.process():
         data = json.loads(message.body.decode())
 
-        filename = data["filename"]
-        audio_bytes = data["audio_bytes"].encode("latin1")
+        queue_logger.info(
+            "Received raw audio upload message",
+            extra={
+                "service": "audio-service",
+                "queue": QUEUE_NAME,
+                "exchange": EXCHANGE_NAME,
+                "routing_key": "audio.raw",
+                "request_id": data.get("request_id"),
+                "audio_filename": data.get("audio_filename"),
+                "event": "process.start",
+            },
+        )
 
-        # 1. Save file
-        file_path = save_file(audio_bytes, filename)
+        audio_filename = data["audio_filename"]
+       
+
+
+        queue_logger.info(
+            "Saved uploaded audio file",
+            extra={
+                "service": "audio-service",
+                "queue": QUEUE_NAME,
+                "exchange": EXCHANGE_NAME,
+                "file_path": audio_filename,
+                "request_id": data.get("request_id"),
+                "event": "file.saved",
+            },
+        )
 
         # 2. Convert
-        wav_path = convert_to_wav(file_path)
+        wav_path = convert_to_wav(audio_filename)
+        queue_logger.info(
+            "Converted audio to WAV",
+            extra={
+                "service": "audio-service",
+                "queue": QUEUE_NAME,
+                "exchange": EXCHANGE_NAME,
+                "wav_path": wav_path,
+                "request_id": data.get("request_id"),
+                "event": "audio.converted",
+            },
+        )
 
         # 3. Update payload
         data["audio_path"] = wav_path
@@ -83,10 +117,28 @@ async def main():
 
     await queue.consume(lambda msg: process_message(msg, exchange))
 
+    queue_logger.info(
+        "Audio service startup complete",
+        extra={
+            "service": "audio-service",
+            "queue": QUEUE_NAME,
+            "exchange": EXCHANGE_NAME,
+            "event": "service.started",
+        },
+    )
     print("🎧 Audio service running...")
 
     await asyncio.Future()
 
 
 if __name__ == "__main__":
+    queue_logger.info(
+        "Starting audio-service",
+        extra={
+            "service": "audio-service",
+            "queue": QUEUE_NAME,
+            "exchange": EXCHANGE_NAME,
+            "event": "service.starting",
+        },
+    )
     asyncio.run(main())

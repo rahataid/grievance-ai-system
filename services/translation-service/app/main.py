@@ -29,6 +29,7 @@ async def process_message(message: aio_pika.IncomingMessage, exchange):
 
         # 🧠 Translate (only non-en should reach here)
         translated_text = await translate(text, lang)
+        print(f"Translated text: {translated_text}")
 
         # update payload
         data["translated_text"] = translated_text

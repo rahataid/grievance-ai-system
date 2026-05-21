@@ -78,6 +78,25 @@ async def _publish_audio_event(payload: dict) -> None:
         await connection.close()
 
 
+import uuid
+from pathlib import Path
+
+
+
+BASE_DIR = Path("/Users/rumsan/Documents/apps/grievance-ai-system")
+
+UPLOAD_DIR = BASE_DIR / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+def save_file(file_bytes: bytes, audio_filename: str) -> str:
+    unique_name = f"{uuid.uuid4()}_{audio_filename}"
+    file_path = UPLOAD_DIR / unique_name
+
+    with open(file_path, "wb") as f:
+        f.write(file_bytes)
+    return str(file_path)
+
+
 @router.post(
     "",
     response_model=UploadAudioResponse,
@@ -99,6 +118,14 @@ async def upload_audio(
 
     payload = {
         "request_id": audio_id,
+        "audio_filename": file.filename or f"{audio_id}.wav"
+
+    }
+    file_path= save_file( audio_bytes, payload["audio_filename"])
+    payload = {
+        "request_id": audio_id,
+        "audio_filename":file_path
+
         "filename": filename,
         "audio_bytes": audio_bytes.decode("latin1"),
     }
@@ -109,7 +136,7 @@ async def upload_audio(
             "service": "api-gateway",
             "source": "upload_audio",
             "queue_request_id": audio_id,
-            "queue_filename": payload["filename"],
+            "queue_audio_filename": payload["audio_filename"],
             "exchange": EXCHANGE_NAME,
             "queue_routing_key": ENTRY_ROUTING_KEY,
             "event": "publish.attempt",
@@ -126,7 +153,7 @@ async def upload_audio(
                 "service": "api-gateway",
                 "source": "upload_audio",
                 "queue_request_id": audio_id,
-                "queue_filename": payload["filename"],
+                "queue_audio_filename": payload["audio_filename"],
                 "exchange": EXCHANGE_NAME,
                 "queue_routing_key": ENTRY_ROUTING_KEY,
                 "event": "publish.failure",
@@ -143,7 +170,7 @@ async def upload_audio(
             "service": "api-gateway",
             "source": "upload_audio",
             "queue_request_id": audio_id,
-            "queue_filename": payload["filename"],
+            "queue_audio_filename": payload["audio_filename"],
             "exchange": EXCHANGE_NAME,
             "queue_routing_key": ENTRY_ROUTING_KEY,
             "event": "publish.success",
@@ -178,6 +205,17 @@ async def get_audio_status(
     """
     Return the processing status and latest grievance result for a specific audio record.
     """
+    queue_logger.info(
+        "Audio status requested",
+        extra={
+            "service": "api-gateway",
+            "source": "get_audio_status",
+            "audio_id": audio_id,
+            "event": "status.query",
+        },
+    )
+
+    # TODO: query persistence-service for the audio record
     result = await db.execute(
         select(Audio)
         .where(Audio.id == audio_id)

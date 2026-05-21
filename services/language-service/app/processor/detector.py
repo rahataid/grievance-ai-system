@@ -1,10 +1,29 @@
-# Language detection logic
-# super simple placeholder — replace later with langdetect / fasttext
+
+
+
+"""Language detection service using langdetect."""
+
+import logging
+from langdetect import detect, LangDetectException
+
+logger = logging.getLogger(__name__)
+
 
 def detect_language(text: str) -> str:
-    text = text.lower()
+    """Detect the language of the given text.
 
-    # dumb heuristic (good enough for now)
-    if all(ord(c) < 128 for c in text):
-        return "en"
-    return "non-en"
+    Returns an ISO 639-1 code (e.g. 'en', 'ne', 'hi').
+    Falls back to 'unknown' on detection failure.
+    """
+    try:
+        lang = detect(text)
+        logger.info(f"Detected language: {lang}")
+        if lang =="en":
+            return "en"
+        else:
+            return "non-en"
+    except LangDetectException as e:        
+
+        logger.error(f"Unexpected error occurred: {e}")
+        return "unknown"
+
