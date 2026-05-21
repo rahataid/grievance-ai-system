@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     JWT_SECRET_KEY: str = "secret-key"
+    API_KEY_ENCRYPTION_SECRET: str | None = None
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     JWT_ISSUER: str = "grievance-auth-service"

@@ -18,6 +18,7 @@ EXCLUDED_PATHS = [
 ]
 
 JWT_AUTH_PATHS = {
+    ("GET", "/auth/api-key"),
     ("POST", "/auth/api-key"),
     ("DELETE", "/auth/api-key"),
 }

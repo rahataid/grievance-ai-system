@@ -11,6 +11,7 @@ requires-python = ">=3.11"
 dependencies = [
     "alembic>=1.18.4",
     "asyncpg>=0.31.0",
+    "cryptography>=45.0.0",
     "email-validator>=2.3.0",
     "fastapi[standard]>=0.136.1",
     "pydantic-settings>=2.14.0",
@@ -21,6 +22,7 @@ dependencies = [
     "SQLAlchemy>=2.0.44",
     "uvicorn>=0.46.0",
     "aio-pika>=9.6.2",
+    "pwdlib[argon2]>=0.3.0",
     "greenlet>=2.0.0",
             "langchain>=0.2.0",
     "langchain-core>=0.2.0",
