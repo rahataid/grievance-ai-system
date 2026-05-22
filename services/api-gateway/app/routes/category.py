@@ -2,13 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, Security, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas import (
-    CategoryCreateRequest,
+	CategoryCreateRequest,
 	CategoryResponse,
 	CategoryUpdateRequest,
 	MessageResponse,
 )
 from services.auth_service.app.api_keys import API_KEY_HEADER
-from services.crud import category as category_crud
+from services.auth_service.app.api_keys import verify_api_key, AuthContext
+from shared.database.services import category as category_crud
 from shared.database.models import Category
 from shared.database.session import get_db
 
@@ -21,29 +22,29 @@ def _serialize_category(category: Category) -> CategoryResponse:
 		app_id=str(category.app_id),
 		categories=category.categories,
 	)
+
 @router.post(
-    "",
-    response_model=CategoryResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Create category",
-    responses={401: {"description": "Unauthorized"}},
+	"",
+	response_model=CategoryResponse,
+	status_code=status.HTTP_201_CREATED,
+	summary="Create category",
+	responses={401: {"description": "Unauthorized"}},
 )
 async def create_category(
-    body: CategoryCreateRequest,
-    _api_key: str | None = Security(API_KEY_HEADER),
-    db: AsyncSession = Depends(get_db),
+	body: CategoryCreateRequest,
+	auth_ctx: AuthContext = Depends(verify_api_key),
+	db: AsyncSession = Depends(get_db),
 ):
-    """
-    Create a new category record.
-    """
+	"""
+	Create a new category record.
+	"""
+	category = await category_crud.create_category(
+		db=db,
+		app_id=auth_ctx.user_id,
+		categories=body.categories,
+	)
+	return _serialize_category(category)
 
-    category = await category_crud.create_category(
-        db=db,
-        app_id=body.app_id,
-        categories=body.categories,
-    )
-
-    return _serialize_category(category)
 
 @router.get(
 	"",
@@ -52,19 +53,13 @@ async def create_category(
 	responses={401: {"description": "Unauthorized"}},
 )
 async def list_categories(
-	app_id: str | None = None,
-	skip: int = 0,
-	limit: int = 100,
-	_api_key: str | None = Security(API_KEY_HEADER),
+	auth_ctx: AuthContext = Depends(verify_api_key),
 	db: AsyncSession = Depends(get_db),
 ):
 	"""
-	Return categories for a specific application when `app_id` is provided, otherwise return all categories.
+	Return categories for the authenticated application.
 	"""
-	if app_id:
-		categories = await category_crud.get_categories_by_app(db, app_id, skip=skip, limit=limit)
-	else:
-		categories = await category_crud.get_all_categories(db, skip=skip, limit=limit)
+	categories = await category_crud.get_categories_by_app(db, auth_ctx.user_id)
 	return [_serialize_category(category) for category in categories]
 
 

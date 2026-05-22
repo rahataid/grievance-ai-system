@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.config import RABBIT_URL, EXCHANGE_NAME, ENTRY_ROUTING_KEY
+from app.config import RABBIT_URL, EXCHANGE_NAME, ENTRY_ROUTING_KEY, BASE_DIR
 from app.schemas import (
     AudioResponse,
     AudioUpdateRequest,
@@ -21,11 +21,11 @@ from app.schemas import (
     CategoryResponse
 )
 from shared.database.models import Category
-from services.crud import category as category_crud
+from shared.database.services import category as category_crud
 from shared.database.session import get_db        
 from shared.database.models.audio import Audio
 from services.auth_service.app.api_keys import API_KEY_HEADER
-from services.crud import audio as audio_crud
+from shared.database.services import audio as audio_crud
 from shared.utils.logger import get_queue_logger
 
 queue_logger = get_queue_logger()
@@ -90,12 +90,9 @@ async def _publish_audio_event(payload: dict) -> None:
 import uuid
 from pathlib import Path
 
-
-
-BASE_DIR = Path("/Users/rumsan/Documents/apps/grievance-ai-system")
-
 UPLOAD_DIR = BASE_DIR / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
 
 def save_file(file_bytes: bytes, audio_filename: str) -> str:
     unique_name = f"{uuid.uuid4()}_{audio_filename}"
@@ -289,6 +286,9 @@ def _serialize_audio(audio: Audio) -> AudioResponse:
     )
 
 
+
+from services.auth_service.app.api_keys import verify_api_key, AuthContext
+
 @router.get(
     "",
     response_model=list[AudioResponse],
@@ -296,19 +296,13 @@ def _serialize_audio(audio: Audio) -> AudioResponse:
     responses={401: {"description": "Unauthorized"}},
 )
 async def list_audio(
-    app_id: str | None = None,
-    skip: int = 0,
-    limit: int = 100,
-    _api_key: str | None = Security(API_KEY_HEADER),
+    auth_ctx: AuthContext = Depends(verify_api_key),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Return audio records for a specific application when `app_id` is provided, otherwise return all audio records.
+    Return audio records for the authenticated application.
     """
-    if app_id:
-        audios = await audio_crud.get_audios_by_app(db, app_id, skip=skip, limit=limit)
-    else:
-        audios = await audio_crud.get_all_audios(db, skip=skip, limit=limit)
+    audios = await audio_crud.get_audios_by_app(db, auth_ctx.user_id)
     return [_serialize_audio(audio) for audio in audios]
 
 

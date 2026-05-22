@@ -8,7 +8,7 @@ from app.processor.audio_processor import convert_to_wav
 from app.utils.file_handler import save_file
 from shared.database.session import SessionLocal
 from shared.utils.logger import get_queue_logger
-from services.crud import audio as audio_crud
+from shared.database.crud import audio as audio_crud
 
 queue_logger = get_queue_logger()
 

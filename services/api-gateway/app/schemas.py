@@ -80,12 +80,6 @@ class AppResponse(BaseModel):
     is_verified: bool
 
 
-class AppUpdateRequest(BaseModel):
-    name: Optional[str] = None
-    email: Optional[EmailStr] = None
-    is_verified: Optional[bool] = None
-
-
 class CategoryUpdateRequest(BaseModel):
     categories: Optional[dict | list] = None
 
@@ -96,10 +90,7 @@ class CategoryResponse(BaseModel):
     categories: dict | list
 
 
-
-
 class CategoryCreateRequest(BaseModel):
-    app_id: str
     categories: list[str] | dict[str, Any]
 class AudioResponse(BaseModel):
     id: str
