@@ -13,7 +13,7 @@ from app.config import (
 from app.processor.main import analyze
 from shared.database.session import SessionLocal
 from shared.utils.logger import get_queue_logger
-from services.crud import audio as audio_crud
+from shared.database.crud import audio as audio_crud
 
 queue_logger = get_queue_logger()
 

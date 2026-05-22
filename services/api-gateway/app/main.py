@@ -14,9 +14,9 @@ from app.routes.app import router as app_router
 from app.routes.auth import router as auth_router
 from app.routes.audio import router as audio_router
 from app.routes.category import router as category_router
-from app.routes.grievance import router as grievance_router
-from services.middleware.api_key_middleware import api_key_middleware    
-from services.middleware.api_key_middleware import api_key_middleware
+# from app.routes.grievance import router as grievance_router
+from services.auth_service.app.middleware.api_key_middleware import api_key_middleware    
+from services.auth_service.app.middleware.api_key_middleware import api_key_middleware
 
 app = FastAPI(
     title="Grievance Audio Processing API",
@@ -46,6 +46,6 @@ app.include_router(auth_router)
 app.include_router(app_router)
 app.include_router(audio_router)
 app.include_router(category_router)
-app.include_router(grievance_router)
+# app.include_router(grievance_router)
 
 

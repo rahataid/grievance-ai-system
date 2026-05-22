@@ -6,7 +6,7 @@ from app.config import RABBIT_URL, EXCHANGE, QUEUE, IN_KEY, OUT_KEY
 from app.processor.urgency import compute_urgency
 from shared.database.session import SessionLocal
 from shared.utils.logger import get_queue_logger
-from services.crud import audio as audio_crud
+from shared.database.crud import audio as audio_crud
 
 queue_logger = get_queue_logger()
 
