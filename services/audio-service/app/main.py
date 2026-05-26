@@ -8,7 +8,7 @@ from app.processor.audio_processor import convert_to_wav
 from app.utils.file_handler import save_file
 from shared.database.session import SessionLocal
 from shared.utils.logger import get_queue_logger
-from shared.database.crud import audio as audio_crud
+from shared.database.services import audio as audio_crud
 
 queue_logger = get_queue_logger()
 
@@ -69,11 +69,28 @@ async def process_message(message: aio_pika.IncomingMessage, exchange):
             },
         )
 
-        # 3. Update payload
-        data["audio_path"] = wav_path
-        data["event"] = AUDIO_UPLOADED
+        # 3. Upload converted WAV to R2
+        from app.utils.r2_handler import upload_file_to_r2
+        wav_filename = wav_path.split("/")[-1]
+        wav_r2_url = upload_file_to_r2(wav_path, filename=wav_filename)
+        queue_logger.info(
+            "Uploaded converted WAV to R2",
+            extra={
+                "service": "audio-service",
+                "queue": QUEUE_NAME,
+                "exchange": EXCHANGE_NAME,
+                "wav_r2_url": wav_r2_url,
+                "request_id": data.get("request_id"),
+                "event": "audio.wav_uploaded",
+            },
+        )
 
-        # 4. Publish to next stage
+        # 4. Update payload
+        data["audio_path"] = wav_r2_url
+        data["event"] = AUDIO_UPLOADED
+        data["wav_path"]=wav_path
+
+        # 5. Publish to next stage
         await exchange.publish(
             aio_pika.Message(
                 body=json.dumps(data).encode(),
@@ -94,7 +111,7 @@ async def process_message(message: aio_pika.IncomingMessage, exchange):
             },
         )
 
-        print(f"Processed audio → {wav_path}")
+        print(f"Processed audio → {wav_r2_url}")
 
 
 async def main():

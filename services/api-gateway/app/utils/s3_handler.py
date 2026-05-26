@@ -26,6 +26,9 @@ def upload_file_to_r2(file_bytes: bytes, filename: str, bucket: str = None, fold
     try:
         s3.put_object(Bucket=bucket, Key=key, Body=file_bytes)
         r2_url = R2_URL_FORMAT.format(bucket=bucket, public_domain=R2_PUBLIC_DOMAIN, key=key)
+        # Ensure the URL starts with 'https://' and not 'https:/'
+        if r2_url.startswith("https:/") and not r2_url.startswith("https://"):
+            r2_url = r2_url.replace("https:/", "https://", 1)
         return r2_url
     except NoCredentialsError:
         raise Exception("R2 credentials not found.")

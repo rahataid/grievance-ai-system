@@ -1,4 +1,5 @@
 # Entry point for Persistence Service
+import os
 import asyncio
 import json
 import aio_pika
@@ -13,6 +14,12 @@ async def process(message, exchange):
     async with message.process():
         data = json.loads(message.body.decode())
         audio_id = data.get("request_id")
+        wav_path = data.get("wav_path")
+                # Delete temporary WAV file
+        if wav_path and os.path.exists(wav_path):
+            os.remove(wav_path)
+            queue_logger.info(f"Deleted temp file: {wav_path}")
+
 
         try:
             await save_to_db(data)

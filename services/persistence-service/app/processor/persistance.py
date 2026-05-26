@@ -3,7 +3,7 @@ import json
 from typing import Optional
 
 from shared.database.session import SessionLocal
-from shared.database.crud import grievance as grievance_crud
+from shared.database.services import grievance as grievance_crud
 
 
 async def save_to_db(data: dict) -> Optional[dict]:
@@ -63,7 +63,7 @@ async def save_to_db(data: dict) -> Optional[dict]:
             )
 
             # Update audio record to completion
-            from shared.database.crud import audio as audio_crud
+            from shared.database.services import audio as audio_crud
             await audio_crud.update_audio(
                 db=db,
                 audio_id=audio_id,

@@ -73,20 +73,20 @@ async def process_message(
                 },
             )
 
-            audio_path = data.get(
-                "audio_path"
+            wav_path = data.get(
+                "wav_path"
             )
 
-            if not audio_path:
+            if not wav_path:
 
                 raise ValueError(
-                    "Missing audio_path "
+                    "Missing wav_path "
                     "in ASR input"
                 )
 
             # 🎤 Transcribe
             transcript = await transcribe(
-                audio_path
+                wav_path
             )
 
             queue_logger.info(
@@ -95,7 +95,7 @@ async def process_message(
                     "service": "asr-service",
                     "queue": QUEUE_NAME,
                     "exchange": EXCHANGE_NAME,
-                    "audio_path": audio_path,
+                    "wav_path": wav_path,
                     "request_id": data.get(
                         "request_id"
                     ),

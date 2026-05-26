@@ -13,7 +13,7 @@ from app.config import (
 from app.processor.translator import translate
 from shared.database.session import SessionLocal
 from shared.utils.logger import get_queue_logger
-from shared.database.crud import audio as audio_crud
+from shared.database.services import audio as audio_crud
 
 queue_logger = get_queue_logger()
 

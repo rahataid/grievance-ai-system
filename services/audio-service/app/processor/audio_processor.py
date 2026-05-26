@@ -1,92 +1,103 @@
-
-
-
 import logging
 import os
-
 import subprocess
+import tempfile
+from urllib.parse import urlparse
 
+import boto3
+from botocore.client import Config
 
-
-import torch
-
+from app.config import (
+    R2_ACCOUNT_ID,
+    R2_ACCESS_KEY_ID,
+    R2_SECRET_ACCESS_KEY,
+    R2_BUCKET,
+)
 
 logger = logging.getLogger(__name__)
 
-# Performance tuning
-torch.backends.cudnn.benchmark = True
-torch.set_num_threads(1)
-
-# Native formats
-NATIVE_AUDIO_FORMATS = {
-    ".wav", ".flac", ".ogg", ".oga", ".opus",
-    ".aiff", ".aif", ".aifc",
-    ".au", ".snd",
-    ".caf",
-    ".w64", ".rf64",
-    ".mp3",
-    ".nist", ".sph",
-    ".voc", ".svx",
-}
-
-# Requires ffmpeg
-CONVERTIBLE_AUDIO_FORMATS = {
-    ".mp4", ".m4a", ".aac", ".wma", ".webm",
-    ".amr", ".3gp", ".mka", ".ac3", ".ape",
-    ".wv", ".tta", ".spx",
-}
-
-SUPPORTED_AUDIO_FORMATS = (
-    NATIVE_AUDIO_FORMATS
-    | CONVERTIBLE_AUDIO_FORMATS
+s3 = boto3.client(
+    "s3",
+    endpoint_url=f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com",
+    aws_access_key_id=R2_ACCESS_KEY_ID,
+    aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+    config=Config(signature_version="s3v4"),
+    region_name="auto",
 )
 
+def download_from_r2(r2_url: str) -> str:
+    """
+    Download private R2 object locally.
+    """
 
-def get_file_extension(audio_filename: str) -> str:
-    return os.path.splitext(
-        audio_filename
-    )[1].lower()
+    parsed = urlparse(r2_url)
 
+    # Entire path is the key
+    key = parsed.path.lstrip("/")
 
+    if not key:
+        raise ValueError(f"Invalid R2 URL: {r2_url}")
 
+    extension = os.path.splitext(key)[1]
 
-from pathlib import Path
-import subprocess
-
-def convert_to_wav(input_path) -> str:
-    input_path = Path(input_path)
-
-    output_path = input_path.with_suffix(
-        input_path.suffix + ".converted.wav"
+    tmp = tempfile.NamedTemporaryFile(
+        suffix=extension,
+        delete=False,
     )
 
-    try:
-        subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(input_path),
-                "-ar",
-                "16000",
-                "-ac",
-                "1",
-                "-f",
-                "wav",
-                str(output_path),
-            ],
-            check=True,
-            capture_output=True,
-            timeout=120,
-        )
+    local_path = tmp.name
+    tmp.close()
 
-        return str(output_path)
+    print(f"[DEBUG] Downloading key: {key}")
+    print(f"[DEBUG] Local path: {local_path}")
 
-    except FileNotFoundError:
-        raise RuntimeError("ffmpeg is not installed.")
+    s3.download_file(
+        Bucket=R2_BUCKET,
+        Key=key,
+        Filename=local_path,
+    )
 
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(
-            "ffmpeg conversion failed: "
-            f"{e.stderr.decode(errors='replace')}"
-        )
+    return local_path
+
+def convert_to_wav(input_path: str) -> str:
+    """
+    Converts audio to wav and returns LOCAL wav path.
+    DOES NOT upload back to R2.
+    DOES NOT delete original file.
+    """
+
+    print(f"[DEBUG] convert_to_wav input_path: {input_path}")
+
+    is_url = input_path.startswith("http")
+
+    local_input_path = input_path
+
+    # Download from R2 if URL
+    if is_url:
+        local_input_path = download_from_r2(input_path)
+
+        print(f"[DEBUG] Downloaded local file: {local_input_path}")
+
+    output_path = local_input_path + ".converted.wav"
+
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            local_input_path,
+            "-ar",
+            "16000",
+            "-ac",
+            "1",
+            "-f",
+            "wav",
+            output_path,
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+    print(f"[DEBUG] Converted wav path: {output_path}")
+
+    return output_path
