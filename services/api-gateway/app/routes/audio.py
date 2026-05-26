@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.config import RABBIT_URL, EXCHANGE_NAME, ENTRY_ROUTING_KEY, BASE_DIR
+from app.config import RABBIT_URL, EXCHANGE_NAME, ENTRY_ROUTING_KEY, R2_BUCKET
 from app.schemas import (
     AudioResponse,
     AudioUpdateRequest,
@@ -27,6 +27,7 @@ from shared.database.models.audio import Audio
 from services.auth_service.app.api_keys import API_KEY_HEADER
 from shared.database.services import audio as audio_crud
 from shared.utils.logger import get_queue_logger
+from app.utils.s3_handler import upload_file_to_r2
 
 queue_logger = get_queue_logger()
 router = APIRouter(prefix="/audio", tags=["Audio"])
@@ -87,21 +88,6 @@ async def _publish_audio_event(payload: dict) -> None:
         await connection.close()
 
 
-import uuid
-from pathlib import Path
-
-UPLOAD_DIR = BASE_DIR / "uploads"
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
-
-def save_file(file_bytes: bytes, audio_filename: str) -> str:
-    unique_name = f"{uuid.uuid4()}_{audio_filename}"
-    file_path = UPLOAD_DIR / unique_name
-
-    with open(file_path, "wb") as f:
-        f.write(file_bytes)
-    return str(file_path)
-
 
 @router.post(
     "",
@@ -127,10 +113,12 @@ async def upload_audio(
             detail="Unable to resolve API key authentication context",
         )
 
+
     audio_bytes = await file.read()
     audio_id = str(uuid4())
     filename = file.filename or f"{audio_id}.wav"
-    file_path = save_file(audio_bytes, filename)
+    # Upload to R2 
+    file_path = upload_file_to_r2(audio_bytes, filename, R2_BUCKET)
 
     # Persist the audio record immediately, then enqueue
     await audio_crud.create_audio(
