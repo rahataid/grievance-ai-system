@@ -3,16 +3,16 @@ name: CICD
 on:
   push:
     branches:
-      - main
+      - dev
   workflow_dispatch:
     inputs:
       image_tag:
         description: "Docker image tag"
         required: true
-        default: "main"
+        default: "dev"
 
 env:
-  IMAGE_NAME: esatya/grievance-ai-system
+  IMAGE_NAME: rumsan/grievance-ai-system
 
 jobs:
   build-and-push:
