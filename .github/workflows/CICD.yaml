@@ -25,7 +25,7 @@ env:
 
 jobs:
   # 1. Determine which services need to be built
-  searching-changes:
+  detect-changes:
     runs-on: ubuntu-latest
     outputs:
       services: ${{ steps.set-matrix.outputs.services }}
@@ -48,7 +48,7 @@ jobs:
           fi
 
   build-and-push:
-    needs: searching-changes
+    needs: detect-changes
     name: Build and Push
     runs-on: ubuntu-latest
     strategy:
