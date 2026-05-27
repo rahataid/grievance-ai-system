@@ -36,7 +36,7 @@ RUN groupadd -g 10001 appgroup && \
 
 COPY --from=builder --chown=appuser:appgroup /app/.venv /app/.venv
 
-COPY --chown=appuser:appgroup services/api-gateway/ /app/services/api-gateway/
+COPY --chown=appuser:appgroup services/${SERVICE_NAME}/ /app/services/${SERVICE_NAME}/
 COPY --chown=appuser:appgroup shared/ /app/shared/
 COPY --chown=appuser:appgroup config.py /app/config.py
 
@@ -47,4 +47,5 @@ USER appuser
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)" || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--app-dir", "services/api-gateway"]
+# Start the specific microservice using uvicorn dynamically
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 --app-dir services/${SERVICE_NAME}"]
