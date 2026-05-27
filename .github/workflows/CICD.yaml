@@ -17,8 +17,8 @@ env:
 jobs:
   build-and-push:
     name: Build and Push Docker Image
-    runs-on: arc-runner-set-rumsanai
-
+    # runs-on: arc-runner-set-rumsanai
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
