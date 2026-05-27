@@ -48,7 +48,7 @@ jobs:
           fi
 
   build-and-push:
-    needs: detect-changes
+    needs: searching-changes
     name: Build and Push
     runs-on: ubuntu-latest
     strategy:
