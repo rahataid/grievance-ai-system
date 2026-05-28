@@ -128,6 +128,7 @@ jobs:
           tags: |
             ${{ env.REGISTRY_OWNER }}/grievance-${{ matrix.service }}:${{ env.IMAGE_TAG }}
             ${{ env.REGISTRY_OWNER }}/grievance-${{ matrix.service }}:latest
+          network: host
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
