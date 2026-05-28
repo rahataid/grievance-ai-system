@@ -65,7 +65,7 @@ jobs:
     runs-on: arc-runner-set
     strategy:
       fail-fast: false
-      max-parallel: 3
+      max-parallel: 1
       matrix:
         service: ${{ fromJson(needs.detect-changes.outputs.services) }}
     steps:
