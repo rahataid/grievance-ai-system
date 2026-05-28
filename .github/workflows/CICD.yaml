@@ -40,7 +40,7 @@ jobs:
       # REMOVED: "Free runner disk space" step. It does nothing on ARC runners.
 
       # Fixed to return clean JSON arrays and pass an explicit boolean flag to prevent matrix errors
-       Pentest matrix generation
+      # Pentest matrix generation
       - name: Set Matrix Packages
         id: set-matrix
         run: |
