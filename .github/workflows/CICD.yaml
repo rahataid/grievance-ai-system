@@ -27,7 +27,7 @@ env:
 jobs:
   # 1. Determine which services need to be built
   detect-changes:
-    runs-on: arc-runner-set-tmjnp-runner-vrdkv
+    runs-on: arc-runner-set
     outputs:
       services: ${{ steps.set-matrix.outputs.services }}
     steps:
@@ -58,7 +58,7 @@ jobs:
   build-and-push:
     needs: detect-changes
     name: Build and Push
-    runs-on: arc-runner-set-tmjnp-runner-vrdkv
+    runs-on: arc-runner-set
     strategy:
       fail-fast: false
       matrix:
