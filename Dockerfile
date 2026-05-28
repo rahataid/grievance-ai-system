@@ -3,16 +3,17 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 WORKDIR /app
 
-ENV UV_COMPILE_BYTECODE=1
-ENV UV_LINK_MODE=copy
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_NO_BUILD_ISOLATION=1
 
-# Install git + C/C++ build tools required by kenlm (cmake, make, gcc, g++)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     cmake \
     make \
     gcc \
     g++ \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml uv.lock ./
