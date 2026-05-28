@@ -4,12 +4,10 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 WORKDIR /app
 
 ENV UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
-    UV_NO_BUILD_ISOLATION=1
+    UV_LINK_MODE=copy
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
-    cmake \
     make \
     gcc \
     g++ \
@@ -19,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml uv.lock ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system cmake setuptools wheel && \
     uv sync --frozen --no-install-project --no-dev
 
 
