@@ -141,8 +141,8 @@ jobs:
             ${{ env.REGISTRY_OWNER }}/grievance-${{ matrix.service }}:${{ env.IMAGE_TAG }}
             ${{ env.REGISTRY_OWNER }}/grievance-${{ matrix.service }}:latest
           network: host
-          cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          # cache-from: type=gha,scope=${{ matrix.service }}
+          # cache-to: type=gha,mode=max,scope=${{ matrix.service }}
       # REMOVED: "Push tarball via crane" step (Handled natively above).
       # REMOVED: "Cleanup tarball and prune" step (Pod recycling takes care of this).
 
